@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run *)",
+      "Skill(steering)",
+      "Bash(npm test *)",
+      "Bash(npm install *)",
+      "Skill(review-docs)"
+    ]
+  }
+}
