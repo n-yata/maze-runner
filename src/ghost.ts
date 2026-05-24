@@ -84,6 +84,7 @@ export class GhostManager {
       prevMode: 'SCATTER',
       frightenedTimer: 0,
       eatenScore: 0,
+      lastTurnTile: { x: -1, y: -1 },
     };
   }
 
@@ -193,12 +194,17 @@ export class GhostManager {
     const cx = centerPx(col);
     const cy = centerPx(row);
     const nearCenter = Math.abs(g.pixelPos.x - cx) < 2 && Math.abs(g.pixelPos.y - cy) < 2;
+    // Only choose a new direction when arriving at a DIFFERENT tile center.
+    // Without this check, the ghost re-snaps to center every frame while still
+    // within 2px of its departure tile, causing it to never leave.
+    const isNewTile = g.lastTurnTile.x !== col || g.lastTurnTile.y !== row;
 
-    if (nearCenter) {
+    if (nearCenter && isNewTile) {
       // Snap to center, then choose next direction
       g.pixelPos = { x: cx, y: cy };
       const nextDir = this.chooseDirection(g, col, row, map, player, blinky);
       g.dir = nextDir;
+      g.lastTurnTile = { x: col, y: row };
     }
 
     const { dx, dy } = dirToVec(g.dir);

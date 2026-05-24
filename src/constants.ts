@@ -7,7 +7,7 @@ export const TILE_SIZE = 16;
 export const CANVAS_WIDTH = COLS * TILE_SIZE;
 export const CANVAS_HEIGHT = (ROWS + 4) * TILE_SIZE; // extra rows for score UI
 
-export const PLAYER_SPEED = 7.5; // tiles per second
+export const PLAYER_SPEED = 5.5; // tiles per second
 export const GHOST_SPEED = 6.5;
 export const FRIGHTENED_SPEED = 4.0;
 export const EATEN_SPEED = 12.0;

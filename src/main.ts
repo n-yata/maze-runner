@@ -13,6 +13,14 @@ if ('serviceWorker' in navigator) {
   });
 }
 
+function fitToViewport(canvas: HTMLCanvasElement): void {
+  const scaleX = window.innerWidth / canvas.width;
+  const scaleY = window.innerHeight / canvas.height;
+  const scale = Math.min(scaleX, scaleY);
+  canvas.style.width = `${Math.round(canvas.width * scale)}px`;
+  canvas.style.height = `${Math.round(canvas.height * scale)}px`;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   const canvas = document.getElementById('gameCanvas') as HTMLCanvasElement | null;
   if (!canvas) throw new Error('Canvas element not found');
@@ -24,6 +32,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const inputMgr = new InputManager();
   const audio = new AudioManager();
   const storage = new StorageManager();
+
+  fitToViewport(canvas);
+  window.addEventListener('resize', () => fitToViewport(canvas));
 
   const loop = new GameLoop(map, player, ghostMgr, renderer, inputMgr, audio, storage);
   loop.start();

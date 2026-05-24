@@ -42,6 +42,7 @@ export interface GhostState {
   prevMode: GhostMode;
   frightenedTimer: number;
   eatenScore: number;
+  lastTurnTile: Vec2;
 }
 
 export interface GameState {

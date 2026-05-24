@@ -97,7 +97,12 @@ export class PlayerManager {
       const nextCol = tileOf(newX + v.x * (TILE_SIZE / 2 - 1));
       const nextRow = tileOf(newY + v.y * (TILE_SIZE / 2 - 1));
 
-      if (map.isWall(nextCol, nextRow)) {
+      // Allow passing through tunnel exits at the left/right boundary
+      const exitingTunnel =
+        (v.x < 0 && col === 0 && map.isTunnel(0, row)) ||
+        (v.x > 0 && col === COLS - 1 && map.isTunnel(COLS - 1, row));
+
+      if (!exitingTunnel && map.isWall(nextCol, nextRow)) {
         // Snap to center of current tile when hitting wall
         this.state.pixelPos = { x: cx, y: cy };
       } else {
