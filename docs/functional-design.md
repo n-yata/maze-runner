@@ -87,19 +87,19 @@ type Direction = 'UP' | 'DOWN' | 'LEFT' | 'RIGHT' | 'NONE';
 
 ```typescript
 interface PlayerState {
-  pos: Vec2;             // 現在タイル座標
-  pixelPos: Vec2;        // ピクセル単位の座標（スムーズ移動用）
-  direction: Direction;  // 現在の移動方向
-  nextDirection: Direction; // 次の移動方向（入力バッファ）
-  lives: number;         // 残機数（初期値: 3）
-  score: number;         // 現在スコア
-  isAlive: boolean;      // 生存フラグ
+  pos: Vec2;          // 現在タイル座標
+  pixelPos: Vec2;     // ピクセル単位の座標（スムーズ移動用）
+  dir: Direction;     // 現在の移動方向
+  nextDir: Direction; // 次の移動方向（入力バッファ）
+  animFrame: number;  // 口アニメーションフレーム (0-1)
+  isDead: boolean;    // 死亡フラグ（true = 死亡中）
 }
+// 注: lives/score は GameState に保持
 ```
 
 **制約**:
-- `lives` は 0〜5 の整数
-- `score` は 0 以上の整数
+- `GameState.lives` は 0〜3 の整数
+- `GameState.score` は 0 以上の整数
 
 ---
 
@@ -110,9 +110,8 @@ type GhostMode =
   | 'SCATTER'    // 散開（自分のコーナーへ向かう）
   | 'CHASE'      // 追跡（プレイヤーを狙う）
   | 'FRIGHTENED' // イジケ（パワーエサ後）
-  | 'EATEN'      // 食べられた（目だけの状態でハウスへ帰還）
-  | 'HOUSE'      // ゴーストハウス内待機
-  | 'LEAVING';   // ゴーストハウス脱出中
+  | 'EATEN';     // 食べられた（目だけの状態でハウスへ帰還）
+// 注: HOUSE / LEAVING はghost.ts内部のSet管理で吸収（型追加は今後の改善候補）
 ```
 
 ---
@@ -166,13 +165,12 @@ type GamePhase =
 
 ```typescript
 interface HighScore {
-  score: number;   // ハイスコア
-  level: number;   // 到達レベル
-  savedAt: string; // ISO 8601 日時文字列
+  score: number; // ハイスコア（整数）
 }
+// 注: level/savedAt は実装省略（最小実装）
 ```
 
-**保存キー**: `maze-runner:highscore`
+**保存キー**: `mazerun_highscore`
 
 ---
 

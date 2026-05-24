@@ -1,0 +1,20 @@
+{
+  "name": "maze-runner",
+  "version": "1.0.0",
+  "description": "PAC-MAN style browser game - 迷宮ラン",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "dev": "npm run build && npx serve . -l 3000",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "lint": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@vitest/coverage-v8": "^2.0.0",
+    "happy-dom": "^20.9.0",
+    "typescript": "^5.5.0",
+    "vitest": "^2.0.0"
+  }
+}
