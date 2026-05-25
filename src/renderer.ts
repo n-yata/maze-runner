@@ -81,6 +81,11 @@ export class Renderer {
         this.drawStageClear();
         break;
 
+      case 'ALL_CLEAR':
+        map.drawTo(ctx, MAP_OFFSET_Y);
+        this.drawAllClear();
+        break;
+
       case 'GAME_OVER':
         map.drawTo(ctx, MAP_OFFSET_Y);
         this.drawGameOver(state.gameoverCanInput);
@@ -309,6 +314,25 @@ export class Renderer {
 
     ctx.font = `${TILE_SIZE}px monospace`;
     ctx.fillText('ESC to resume', cx, cy + 35);
+  }
+
+  private drawAllClear(): void {
+    const ctx = this.ctx;
+    const cx = CANVAS_WIDTH / 2;
+    const cy = CANVAS_HEIGHT / 2;
+
+    ctx.fillStyle = 'rgba(0,0,0,0.75)';
+    ctx.fillRect(0, cy - 80, CANVAS_WIDTH, 160);
+
+    ctx.fillStyle = '#FFE000';
+    ctx.font = `bold ${TILE_SIZE * 2}px monospace`;
+    ctx.textAlign = 'center';
+    ctx.fillText('ALL CLEAR!', cx, cy - 20);
+
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = `${TILE_SIZE}px monospace`;
+    ctx.fillText('おめでとう！', cx, cy + 15);
+    ctx.fillText('Press SPACE or Tap', cx, cy + 40);
   }
 
   private drawStageClear(): void {

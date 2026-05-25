@@ -1,5 +1,5 @@
 import type { GameState } from './types.js';
-import { INITIAL_LIVES, getLevelParams } from './constants.js';
+import { INITIAL_LIVES, MAX_LEVEL, getLevelParams } from './constants.js';
 import type { MapManager } from './map.js';
 import type { PlayerManager } from './player.js';
 import type { GhostManager } from './ghost.js';
@@ -12,9 +12,10 @@ import type { StorageManager } from './storage.js';
 const FIXED_TIMESTEP = 1 / 60;
 const MAX_ACCUMULATED = 0.2;
 
-const READY_DURATION    = 3.0;
-const DEAD_DURATION     = 1.5;
-const CLEAR_DURATION    = 2.0;
+const READY_DURATION       = 3.0;
+const DEAD_DURATION        = 1.5;
+const CLEAR_DURATION       = 2.0;
+const ALL_CLEAR_DURATION   = 5.0;
 const GAMEOVER_INPUT_DELAY = 3.0;
 
 export class GameLoop {
@@ -63,11 +64,13 @@ export class GameLoop {
       case 'TITLE':
         this.startNewGame();
         break;
+      case 'ALL_CLEAR':
+        this.state = this.createInitialState();
+        break;
       case 'GAME_OVER':
         if (this.state.gameoverCanInput) {
           this.state = this.createInitialState();
-          this.map.reset();
-          // player/ghost のリセットは startNewGame() 経由で getLevelParams(1) と共に行う
+          this.map.reset(1);
         }
         break;
     }
@@ -86,7 +89,7 @@ export class GameLoop {
     this.state = this.createInitialState();
     this.state.phase = 'READY';
     this.state.phaseTimer = 0;
-    this.map.reset();
+    this.map.reset(1);
     const params = getLevelParams(1);
     this.player.reset(params.playerSpeed);
     this.player.resetScore();
@@ -97,11 +100,17 @@ export class GameLoop {
   }
 
   private startNextLevel(): void {
-    this.state.phase = 'READY';
+    if (this.state.level >= MAX_LEVEL) {
+      this.state.phase = 'ALL_CLEAR';
+      this.state.phaseTimer = 0;
+      this.state.dotsEaten = 0;
+      return;
+    }
     this.state.level++;
+    this.state.phase = 'READY';
     this.state.dotsEaten = 0;
     this.state.phaseTimer = 0;
-    this.map.reset();
+    this.map.reset(this.state.level);
     const params = getLevelParams(this.state.level);
     this.player.reset(params.playerSpeed);
     this.ghostMgr.reset(params);
@@ -181,6 +190,13 @@ export class GameLoop {
         this.state.phaseTimer += dt;
         if (this.state.phaseTimer >= CLEAR_DURATION) {
           this.startNextLevel();
+        }
+        break;
+
+      case 'ALL_CLEAR':
+        this.state.phaseTimer += dt;
+        if (this.state.phaseTimer >= ALL_CLEAR_DURATION) {
+          this.state = this.createInitialState();
         }
         break;
 

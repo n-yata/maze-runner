@@ -20,6 +20,7 @@ export type GamePhase =
   | 'PAUSED'
   | 'PLAYER_DEAD'
   | 'STAGE_CLEAR'
+  | 'ALL_CLEAR'
   | 'GAME_OVER';
 
 export type SoundKey = 'EAT_DOT' | 'EAT_POWER' | 'EAT_GHOST' | 'DEATH' | 'GAME_START' | 'EAT_FRUIT';

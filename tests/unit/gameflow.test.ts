@@ -191,13 +191,31 @@ describe('GameLoop – phase transitions', () => {
     expect(state(loop).phase).toBe('STAGE_CLEAR');
   });
 
-  it('STAGE_CLEAR → READY increments level', () => {
+  it('STAGE_CLEAR → READY increments level (within MAX_LEVEL)', () => {
+    const { loop } = makeGameLoop();
+    state(loop).phase = 'STAGE_CLEAR';
+    state(loop).phaseTimer = 0;
+    state(loop).level = 1;
+    tickFor(loop, 2.1);
+    expect(state(loop).phase).toBe('READY');
+    expect(state(loop).level).toBe(2);
+  });
+
+  it('STAGE_CLEAR → ALL_CLEAR when final level cleared', () => {
     const { loop } = makeGameLoop();
     state(loop).phase = 'STAGE_CLEAR';
     state(loop).phaseTimer = 0;
     state(loop).level = 3;
     tickFor(loop, 2.1);
-    expect(state(loop).phase).toBe('READY');
-    expect(state(loop).level).toBe(4);
+    expect(state(loop).phase).toBe('ALL_CLEAR');
+    expect(state(loop).level).toBe(3);
+  });
+
+  it('ALL_CLEAR → TITLE after 5 seconds', () => {
+    const { loop } = makeGameLoop();
+    state(loop).phase = 'ALL_CLEAR';
+    state(loop).phaseTimer = 0;
+    tickFor(loop, 5.1);
+    expect(state(loop).phase).toBe('TITLE');
   });
 });

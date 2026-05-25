@@ -77,6 +77,7 @@ export const SCORE = {
 export const GHOST_EAT_SCORES = [200, 400, 800, 1600] as const;
 
 export const INITIAL_LIVES = 3;
+export const MAX_LEVEL = 3;
 
 export const TUNNEL_COLS = [0, 27]; // x-column indices that are tunnels
 
