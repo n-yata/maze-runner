@@ -37,11 +37,17 @@
     @media (pointer: coarse) {
       body { justify-content: flex-start; }
     }
+    #game-wrapper {
+      overflow: hidden;
+      width: 100%;
+      flex-shrink: 0;
+      display: flex;
+      justify-content: center;
+    }
     #gameCanvas {
       display: block;
       image-rendering: pixelated;
       image-rendering: crisp-edges;
-      flex-shrink: 0;
     }
     /* Dパッド */
     #dpad {
@@ -87,7 +93,9 @@
   </style>
 </head>
 <body>
-  <canvas id="gameCanvas"></canvas>
+  <div id="game-wrapper">
+    <canvas id="gameCanvas"></canvas>
+  </div>
   <div id="dpad">
     <div class="dpad-row">
       <button id="btn-up" class="dpad-btn">▲</button>

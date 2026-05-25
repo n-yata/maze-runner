@@ -88,9 +88,9 @@ export class Renderer {
     ctx.fillStyle = COLORS.SCORE_TEXT;
     ctx.font = `${TILE_SIZE - 2}px monospace`;
     ctx.textAlign = 'left';
-    ctx.fillText(`SCORE: ${state.score}`, 4, TILE_SIZE);
+    ctx.fillText(`SCORE: ${state.score}`, TILE_SIZE + 4, TILE_SIZE);
     ctx.textAlign = 'right';
-    ctx.fillText(`HI: ${state.highScore}`, CANVAS_WIDTH - 4, TILE_SIZE);
+    ctx.fillText(`HI: ${state.highScore}`, CANVAS_WIDTH - TILE_SIZE - 4, TILE_SIZE);
 
     ctx.fillStyle = COLORS.SCORE_TEXT;
     ctx.textAlign = 'left';
@@ -100,7 +100,7 @@ export class Renderer {
     // Lives display
     ctx.fillStyle = COLORS.LIFE_COLOR;
     for (let i = 0; i < state.lives; i++) {
-      const lx = 8 + i * (TILE_SIZE + 2);
+      const lx = TILE_SIZE + 8 + i * (TILE_SIZE + 2);
       const ly = TILE_SIZE * 3;
       ctx.beginPath();
       ctx.arc(lx, ly, TILE_SIZE / 2 - 1, 0.25 * Math.PI, 1.75 * Math.PI);

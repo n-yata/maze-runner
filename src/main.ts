@@ -1,4 +1,5 @@
 import type { Direction } from './types.js';
+import { COLS } from './constants.js';
 import { MapManager } from './map.js';
 import { PlayerManager } from './player.js';
 import { GhostManager } from './ghost.js';
@@ -15,8 +16,17 @@ if ('serviceWorker' in navigator) {
 }
 
 function fitToViewport(canvas: HTMLCanvasElement): void {
-  const scaleX = window.innerWidth / canvas.width;
   const scaleY = window.innerHeight / canvas.height;
+  let scaleX: number;
+
+  if (window.matchMedia('(pointer: coarse)').matches) {
+    // On touch devices, scale so the inner 26 cols fill viewport width.
+    // This clips col 0 and col 27 (pure outer wall) for ~7.7% larger tiles.
+    scaleX = window.innerWidth / (canvas.width * (COLS - 2) / COLS);
+  } else {
+    scaleX = window.innerWidth / canvas.width;
+  }
+
   const scale = Math.min(scaleX, scaleY);
   canvas.style.width = `${Math.round(canvas.width * scale)}px`;
   canvas.style.height = `${Math.round(canvas.height * scale)}px`;
