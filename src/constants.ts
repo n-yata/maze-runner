@@ -81,3 +81,65 @@ export const INITIAL_LIVES = 3;
 export const TUNNEL_COLS = [0, 27]; // x-column indices that are tunnels
 
 export type { GhostMode };
+
+export interface LevelParams {
+  playerSpeed: number;
+  ghostSpeed: number;
+  frightenedSpeed: number;
+  frightenedDuration: number;
+  ghostReleaseThresholds: Record<GhostName, number>;
+  modeSchedule: number[];
+}
+
+const LEVEL_PARAMS: LevelParams[] = [
+  // Level 1
+  {
+    playerSpeed: 5.5,
+    ghostSpeed: 4.5,
+    frightenedSpeed: 3.0,
+    frightenedDuration: 6.0,
+    ghostReleaseThresholds: { BLINKY: 0, PINKY: 0, INKY: 30, CLYDE: 60 },
+    modeSchedule: [7, 20, 7, 20, 5, 20, 5],
+  },
+  // Level 2
+  {
+    playerSpeed: 5.8,
+    ghostSpeed: 5.0,
+    frightenedSpeed: 3.0,
+    frightenedDuration: 5.0,
+    ghostReleaseThresholds: { BLINKY: 0, PINKY: 0, INKY: 20, CLYDE: 40 },
+    modeSchedule: [7, 20, 7, 20, 5, 20, 5],
+  },
+  // Level 3
+  {
+    playerSpeed: 6.0,
+    ghostSpeed: 5.5,
+    frightenedSpeed: 3.0,
+    frightenedDuration: 4.0,
+    ghostReleaseThresholds: { BLINKY: 0, PINKY: 0, INKY: 15, CLYDE: 30 },
+    modeSchedule: [7, 20, 7, 20, 5, 20, 5],
+  },
+  // Level 4
+  {
+    playerSpeed: 6.2,
+    ghostSpeed: 5.8,
+    frightenedSpeed: 3.0,
+    frightenedDuration: 3.0,
+    ghostReleaseThresholds: { BLINKY: 0, PINKY: 0, INKY: 10, CLYDE: 20 },
+    modeSchedule: [7, 20, 5, 20, 5, 20, 5],
+  },
+  // Level 5+
+  {
+    playerSpeed: 6.5,
+    ghostSpeed: 6.2,
+    frightenedSpeed: 3.0,
+    frightenedDuration: 2.0,
+    ghostReleaseThresholds: { BLINKY: 0, PINKY: 0, INKY: 5, CLYDE: 10 },
+    modeSchedule: [5, 20, 5, 20, 5, 20, 5],
+  },
+];
+
+export function getLevelParams(level: number): LevelParams {
+  const clamped = Math.max(1, Math.min(level, LEVEL_PARAMS.length));
+  return LEVEL_PARAMS[clamped - 1]!;
+}

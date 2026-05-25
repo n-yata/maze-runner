@@ -1,5 +1,5 @@
 import type { GameState } from './types.js';
-import { INITIAL_LIVES } from './constants.js';
+import { INITIAL_LIVES, getLevelParams } from './constants.js';
 import type { MapManager } from './map.js';
 import type { PlayerManager } from './player.js';
 import type { GhostManager } from './ghost.js';
@@ -65,8 +65,7 @@ export class GameLoop {
         if (this.state.gameoverCanInput) {
           this.state = this.createInitialState();
           this.map.reset();
-          this.player.reset();
-          this.ghostMgr.reset();
+          // player/ghost のリセットは startNewGame() 経由で getLevelParams(1) と共に行う
         }
         break;
     }
@@ -86,9 +85,10 @@ export class GameLoop {
     this.state.phase = 'READY';
     this.state.phaseTimer = 0;
     this.map.reset();
-    this.player.reset();
+    const params = getLevelParams(1);
+    this.player.reset(params.playerSpeed);
     this.player.resetScore();
-    this.ghostMgr.reset();
+    this.ghostMgr.reset(params);
     this.lastPowerDotCount = -1;
     this.audio.play('GAME_START');
   }
@@ -99,16 +99,18 @@ export class GameLoop {
     this.state.dotsEaten = 0;
     this.state.phaseTimer = 0;
     this.map.reset();
-    this.player.reset();
-    this.ghostMgr.reset();
+    const params = getLevelParams(this.state.level);
+    this.player.reset(params.playerSpeed);
+    this.ghostMgr.reset(params);
     this.lastPowerDotCount = -1;
   }
 
   private respawnPlayer(): void {
     this.state.phase = 'READY';
     this.state.phaseTimer = 0;
-    this.player.reset();
-    this.ghostMgr.reset();
+    const params = getLevelParams(this.state.level);
+    this.player.reset(params.playerSpeed);
+    this.ghostMgr.reset(params);
     this.lastPowerDotCount = -1;
   }
 

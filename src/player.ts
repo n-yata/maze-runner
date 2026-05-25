@@ -26,6 +26,7 @@ function centerPx(tile: number): number {
 export class PlayerManager {
   state: PlayerState;
   score: number = 0;
+  private speed = PLAYER_SPEED;
 
   constructor() {
     this.state = this.createInitialState();
@@ -45,7 +46,10 @@ export class PlayerManager {
     };
   }
 
-  reset(): void {
+  reset(speed?: number): void {
+    if (speed !== undefined) {
+      this.speed = speed;
+    }
     this.state = this.createInitialState();
   }
 
@@ -62,7 +66,7 @@ export class PlayerManager {
   update(dt: number, map: MapManager, audio: AudioManager): void {
     if (this.state.isDead) return;
 
-    const speed = PLAYER_SPEED * TILE_SIZE; // px/s
+    const speed = this.speed * TILE_SIZE; // px/s
     const dist = speed * dt;
 
     this.state.animFrame = (this.state.animFrame + dt * 8) % 1;

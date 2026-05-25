@@ -3,7 +3,7 @@ import { GhostManager } from '../../src/ghost.js';
 import { MapManager } from '../../src/map.js';
 import { PlayerManager } from '../../src/player.js';
 import { AudioManager } from '../../src/audio.js';
-import { GHOST_STARTS, GHOST_SCATTER_TARGETS } from '../../src/constants.js';
+import { GHOST_STARTS, GHOST_SCATTER_TARGETS, getLevelParams } from '../../src/constants.js';
 
 function makeDeps() {
   const map = new MapManager();
@@ -67,6 +67,26 @@ describe('GhostManager', () => {
       expect(ghost.pos.x).toBe(expected.x);
       expect(ghost.pos.y).toBe(expected.y);
     }
+  });
+
+  it('reset with LevelParams applies frightenedDuration to triggerFrightened', () => {
+    const params = getLevelParams(3); // frightenedDuration: 4.0
+    mgr.reset(params);
+    mgr.triggerFrightened();
+    const blinky = mgr.ghosts.find(g => g.name === 'BLINKY')!;
+    expect(blinky.frightenedTimer).toBeCloseTo(params.frightenedDuration);
+  });
+
+  it('reset with LevelParams uses updated release thresholds', () => {
+    const { map, player, audio } = makeDeps();
+    const params = getLevelParams(3); // INKY: 15, CLYDE: 30
+    mgr.reset(params);
+    const inky = mgr.ghosts.find(g => g.name === 'INKY')!;
+    // 15 dots should release Inky (Level 3 threshold)
+    for (let i = 0; i < 5; i++) {
+      mgr.update(1 / 60, map, player, audio, 15);
+    }
+    expect(inky.mode).toBe('SCATTER');
   });
 
   it('getFrightenedEndWarning returns false when no ghosts are frightened', () => {

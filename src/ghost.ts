@@ -12,6 +12,7 @@ import {
   FRIGHTENED_DURATION,
   MODE_SCHEDULE,
   GHOST_EAT_SCORES,
+  type LevelParams,
 } from './constants.js';
 import type { MapManager } from './map.js';
 import type { PlayerManager } from './player.js';
@@ -66,6 +67,11 @@ export class GhostManager {
   private modeIndex = 0;
   private released: Set<GhostName>;
   private inHouse: Set<GhostName>;
+  private ghostSpeed = GHOST_SPEED;
+  private frightenedSpd = FRIGHTENED_SPEED;
+  private frightenedDur = FRIGHTENED_DURATION;
+  private releaseThresholds: Record<GhostName, number> = { ...GHOST_RELEASE_DOT_THRESHOLDS };
+  private modeSchedule: number[] = [...MODE_SCHEDULE];
 
   constructor() {
     this.ghosts = GHOST_NAMES.map(name => this.createGhost(name));
@@ -88,7 +94,14 @@ export class GhostManager {
     };
   }
 
-  reset(): void {
+  reset(params?: LevelParams): void {
+    if (params) {
+      this.ghostSpeed = params.ghostSpeed;
+      this.frightenedSpd = params.frightenedSpeed;
+      this.frightenedDur = params.frightenedDuration;
+      this.releaseThresholds = { ...params.ghostReleaseThresholds };
+      this.modeSchedule = [...params.modeSchedule];
+    }
     this.ghosts = GHOST_NAMES.map(name => this.createGhost(name));
     this.modeTimer = 0;
     this.modeIndex = 0;
@@ -101,7 +114,7 @@ export class GhostManager {
       if (g.mode !== 'EATEN') {
         g.prevMode = g.mode;
         g.mode = 'FRIGHTENED';
-        g.frightenedTimer = FRIGHTENED_DURATION;
+        g.frightenedTimer = this.frightenedDur;
       }
     }
   }
@@ -116,19 +129,19 @@ export class GhostManager {
     let scoreGained = 0;
 
     // Release ghosts based on dots eaten
-    if (!this.released.has('INKY') && dotsEaten >= GHOST_RELEASE_DOT_THRESHOLDS['INKY']) {
+    if (!this.released.has('INKY') && dotsEaten >= this.releaseThresholds['INKY']) {
       this.released.add('INKY');
       this.inHouse.delete('INKY');
     }
-    if (!this.released.has('CLYDE') && dotsEaten >= GHOST_RELEASE_DOT_THRESHOLDS['CLYDE']) {
+    if (!this.released.has('CLYDE') && dotsEaten >= this.releaseThresholds['CLYDE']) {
       this.released.add('CLYDE');
       this.inHouse.delete('CLYDE');
     }
 
     // Global mode timer (only affects non-FRIGHTENED, non-EATEN)
     this.modeTimer += dt;
-    if (this.modeIndex < MODE_SCHEDULE.length) {
-      if (this.modeTimer >= (MODE_SCHEDULE[this.modeIndex] ?? Infinity)) {
+    if (this.modeIndex < this.modeSchedule.length) {
+      if (this.modeTimer >= (this.modeSchedule[this.modeIndex] ?? Infinity)) {
         this.modeTimer = 0;
         this.modeIndex++;
         const newMode: GhostMode = this.modeIndex % 2 === 0 ? 'SCATTER' : 'CHASE';
@@ -184,9 +197,9 @@ export class GhostManager {
     player: PlayerManager,
     blinky: GhostState,
   ): void {
-    const speed = g.mode === 'FRIGHTENED' ? FRIGHTENED_SPEED
+    const speed = g.mode === 'FRIGHTENED' ? this.frightenedSpd
                 : g.mode === 'EATEN'      ? EATEN_SPEED
-                : GHOST_SPEED;
+                : this.ghostSpeed;
     const dist = speed * TILE_SIZE * dt;
 
     const col = tileOf(g.pixelPos.x);
