@@ -3,6 +3,7 @@ import { INITIAL_LIVES, getLevelParams } from './constants.js';
 import type { MapManager } from './map.js';
 import type { PlayerManager } from './player.js';
 import type { GhostManager } from './ghost.js';
+import type { FruitManager } from './fruit.js';
 import type { Renderer } from './renderer.js';
 import type { InputManager } from './input.js';
 import type { AudioManager } from './audio.js';
@@ -32,6 +33,7 @@ export class GameLoop {
     private input: InputManager,
     private audio: AudioManager,
     private storage: StorageManager,
+    private fruitMgr: FruitManager,
   ) {
     this.state = this.createInitialState();
     this.input.onStart(() => this.handleStart());
@@ -89,6 +91,7 @@ export class GameLoop {
     this.player.reset(params.playerSpeed);
     this.player.resetScore();
     this.ghostMgr.reset(params);
+    this.fruitMgr.reset();
     this.lastPowerDotCount = -1;
     this.audio.play('GAME_START');
   }
@@ -102,6 +105,7 @@ export class GameLoop {
     const params = getLevelParams(this.state.level);
     this.player.reset(params.playerSpeed);
     this.ghostMgr.reset(params);
+    this.fruitMgr.reset();
     this.lastPowerDotCount = -1;
   }
 
@@ -133,7 +137,7 @@ export class GameLoop {
       this.accumulator -= FIXED_TIMESTEP;
     }
 
-    this.renderer.render(this.state, this.map, this.player, this.ghostMgr);
+    this.renderer.render(this.state, this.map, this.player, this.ghostMgr, this.fruitMgr);
     this.rafId = requestAnimationFrame(this.boundLoop);
   }
 
@@ -205,6 +209,13 @@ export class GameLoop {
 
     const ghostScore = this.ghostMgr.update(dt, this.map, this.player, this.audio, this.state.dotsEaten);
     this.state.score += ghostScore;
+
+    this.fruitMgr.checkSpawn(this.state.dotsEaten, this.state.level);
+    const fruitScore = this.fruitMgr.update(dt, this.player.getPixelPos());
+    if (fruitScore > 0) {
+      this.state.score += fruitScore;
+      this.audio.play('EAT_FRUIT');
+    }
 
     if (this.state.score > this.state.highScore) {
       this.state.highScore = this.state.score;

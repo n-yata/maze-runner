@@ -1,11 +1,12 @@
 import type { GameState, GhostState } from './types.js';
 import {
   TILE_SIZE, CANVAS_WIDTH, CANVAS_HEIGHT,
-  COLORS, GHOST_COLORS,
+  COLORS, GHOST_COLORS, getFruitDef,
 } from './constants.js';
 import type { MapManager } from './map.js';
 import type { PlayerManager } from './player.js';
 import type { GhostManager } from './ghost.js';
+import type { FruitManager } from './fruit.js';
 
 const UI_HEIGHT = 4 * TILE_SIZE;
 const MAP_OFFSET_Y = UI_HEIGHT;
@@ -27,6 +28,7 @@ export class Renderer {
     map: MapManager,
     player: PlayerManager,
     ghostMgr: GhostManager,
+    fruitMgr: FruitManager,
   ): void {
     const ctx = this.ctx;
 
@@ -44,6 +46,7 @@ export class Renderer {
       case 'READY':
         map.drawTo(ctx, MAP_OFFSET_Y);
         map.drawDots(ctx, MAP_OFFSET_Y);
+        this.drawFruit(fruitMgr);
         this.drawGhosts(ghostMgr, false);
         this.drawPlayer(player);
         this.drawReady();
@@ -52,6 +55,7 @@ export class Renderer {
       case 'PLAYING':
         map.drawTo(ctx, MAP_OFFSET_Y);
         map.drawDots(ctx, MAP_OFFSET_Y);
+        this.drawFruit(fruitMgr);
         this.drawGhosts(ghostMgr, ghostMgr.getFrightenedEndWarning());
         this.drawPlayer(player);
         break;
@@ -59,6 +63,7 @@ export class Renderer {
       case 'PAUSED':
         map.drawTo(ctx, MAP_OFFSET_Y);
         map.drawDots(ctx, MAP_OFFSET_Y);
+        this.drawFruit(fruitMgr);
         this.drawGhosts(ghostMgr, false);
         this.drawPlayer(player);
         this.drawPaused();
@@ -214,6 +219,30 @@ export class Renderer {
       ctx.arc(px + r * 0.3, py - r * 0.1, 2, 0, Math.PI * 2);
       ctx.fill();
     }
+  }
+
+  private drawFruit(fruitMgr: FruitManager): void {
+    const state = fruitMgr.getState();
+    if (!state) return;
+
+    // Flash in last 3 seconds (0.25s on/off cycle)
+    if (state.timer < 3.0 && Math.floor(state.timer / 0.25) % 2 === 0) return;
+
+    const ctx = this.ctx;
+    const cx = state.col * TILE_SIZE + TILE_SIZE / 2;
+    const cy = state.row * TILE_SIZE + TILE_SIZE / 2 + MAP_OFFSET_Y;
+    const r = TILE_SIZE / 2 - 1;
+
+    const def = getFruitDef(state.level);
+    ctx.fillStyle = def.color;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    ctx.beginPath();
+    ctx.arc(cx - r * 0.3, cy - r * 0.35, r * 0.3, 0, Math.PI * 2);
+    ctx.fill();
   }
 
   private drawEyes(cx: number, cy: number, r: number): void {

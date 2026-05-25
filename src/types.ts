@@ -22,7 +22,7 @@ export type GamePhase =
   | 'STAGE_CLEAR'
   | 'GAME_OVER';
 
-export type SoundKey = 'EAT_DOT' | 'EAT_POWER' | 'EAT_GHOST' | 'DEATH' | 'GAME_START';
+export type SoundKey = 'EAT_DOT' | 'EAT_POWER' | 'EAT_GHOST' | 'DEATH' | 'GAME_START' | 'EAT_FRUIT';
 
 export interface PlayerState {
   pos: Vec2;

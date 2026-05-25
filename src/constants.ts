@@ -82,6 +82,28 @@ export const TUNNEL_COLS = [0, 27]; // x-column indices that are tunnels
 
 export type { GhostMode };
 
+export interface FruitDef {
+  color: string;
+  score: number;
+}
+
+const FRUIT_TABLE: FruitDef[] = [
+  { color: '#FF2222', score: 100  }, // Level 1: Cherry
+  { color: '#FF44AA', score: 300  }, // Level 2: Strawberry
+  { color: '#FF8800', score: 500  }, // Level 3: Orange
+  { color: '#CC1100', score: 700  }, // Level 4: Apple
+  { color: '#22BB44', score: 1000 }, // Level 5+: Melon
+];
+
+export const FRUIT_SPAWN_THRESHOLDS = [70, 170] as const;
+export const FRUIT_DURATION = 10.0;
+export const FRUIT_SPAWN_POS: Vec2 = { x: 13, y: 17 };
+
+export function getFruitDef(level: number): FruitDef {
+  const idx = Math.max(0, Math.min(level - 1, FRUIT_TABLE.length - 1));
+  return FRUIT_TABLE[idx]!;
+}
+
 export interface LevelParams {
   playerSpeed: number;
   ghostSpeed: number;

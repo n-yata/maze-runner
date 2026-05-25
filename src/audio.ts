@@ -13,6 +13,7 @@ const SOUND_DEFS: Record<SoundKey, SoundDef> = {
   EAT_GHOST: { frequency: 880,  type: 'square',   duration: 0.2,  gainPeak: 0.4 },
   DEATH:     { frequency: 110,  type: 'sawtooth',  duration: 1.0,  gainPeak: 0.5 },
   GAME_START:{ frequency: 523,  type: 'triangle', duration: 0.5,  gainPeak: 0.4 },
+  EAT_FRUIT: { frequency: 660,  type: 'triangle', duration: 0.4,  gainPeak: 0.3 },
 };
 
 export class AudioManager {

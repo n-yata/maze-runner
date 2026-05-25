@@ -3,6 +3,7 @@ import { GameLoop } from '../../src/gameLoop.js';
 import { MapManager } from '../../src/map.js';
 import { PlayerManager } from '../../src/player.js';
 import { GhostManager } from '../../src/ghost.js';
+import { FruitManager } from '../../src/fruit.js';
 import { InputManager } from '../../src/input.js';
 import { AudioManager } from '../../src/audio.js';
 import { StorageManager } from '../../src/storage.js';
@@ -22,8 +23,9 @@ function makeGameLoop() {
     resume: vi.fn(), play: vi.fn(), setMuted: vi.fn(), isMuted: vi.fn(),
   } as unknown as AudioManager;
   const storage = new StorageManager();
+  const fruitMgr = new FruitManager();
 
-  const loop = new GameLoop(map, player, ghosts, renderer, input, audio, storage);
+  const loop = new GameLoop(map, player, ghosts, renderer, input, audio, storage, fruitMgr);
   return { loop, map, player, ghosts, input, audio, storage };
 }
 

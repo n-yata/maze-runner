@@ -3,6 +3,7 @@ import { COLS } from './constants.js';
 import { MapManager } from './map.js';
 import { PlayerManager } from './player.js';
 import { GhostManager } from './ghost.js';
+import { FruitManager } from './fruit.js';
 import { Renderer } from './renderer.js';
 import { InputManager } from './input.js';
 import { AudioManager } from './audio.js';
@@ -57,6 +58,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const map = new MapManager();
   const player = new PlayerManager();
   const ghostMgr = new GhostManager();
+  const fruitMgr = new FruitManager();
   const renderer = new Renderer(canvas);
   const inputMgr = new InputManager();
   const audio = new AudioManager();
@@ -66,6 +68,6 @@ document.addEventListener('DOMContentLoaded', () => {
   window.addEventListener('resize', () => fitToViewport(canvas));
   setupDpad(inputMgr);
 
-  const loop = new GameLoop(map, player, ghostMgr, renderer, inputMgr, audio, storage);
+  const loop = new GameLoop(map, player, ghostMgr, renderer, inputMgr, audio, storage, fruitMgr);
   loop.start();
 });
