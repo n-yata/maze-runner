@@ -22,21 +22,85 @@
     body {
       background: #000;
       display: flex;
-      justify-content: center;
+      flex-direction: column;
       align-items: center;
-      height: 100svh;
+      min-height: 100svh;
       overflow: hidden;
       touch-action: none;
+    }
+    /* デスクトップ(マウス操作)では縦中央寄せ、Dパッド非表示 */
+    @media (pointer: fine) {
+      body { justify-content: center; }
+      #dpad { display: none !important; }
+    }
+    /* タッチデバイスではcanvasを上に、Dパッドを下に */
+    @media (pointer: coarse) {
+      body { justify-content: flex-start; }
     }
     #gameCanvas {
       display: block;
       image-rendering: pixelated;
       image-rendering: crisp-edges;
+      flex-shrink: 0;
+    }
+    /* Dパッド */
+    #dpad {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 8px 0;
+      gap: 4px;
+      width: 100%;
+    }
+    .dpad-row {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .dpad-btn {
+      width: 72px;
+      height: 72px;
+      background: rgba(255, 255, 255, 0.12);
+      border: 2px solid rgba(255, 255, 255, 0.25);
+      border-radius: 14px;
+      color: rgba(255, 255, 255, 0.85);
+      font-size: 30px;
+      line-height: 1;
+      cursor: pointer;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .dpad-btn:active {
+      background: rgba(255, 255, 255, 0.32);
+      border-color: rgba(255, 255, 255, 0.5);
+    }
+    .dpad-center {
+      width: 72px;
+      height: 72px;
     }
   </style>
 </head>
 <body>
   <canvas id="gameCanvas"></canvas>
+  <div id="dpad">
+    <div class="dpad-row">
+      <button id="btn-up" class="dpad-btn">▲</button>
+    </div>
+    <div class="dpad-row">
+      <button id="btn-left" class="dpad-btn">◀</button>
+      <div class="dpad-center"></div>
+      <button id="btn-right" class="dpad-btn">▶</button>
+    </div>
+    <div class="dpad-row">
+      <button id="btn-down" class="dpad-btn">▼</button>
+    </div>
+  </div>
   <script type="module" src="dist/main.js"></script>
 </body>
 </html>

@@ -1,3 +1,4 @@
+import type { Direction } from './types.js';
 import { MapManager } from './map.js';
 import { PlayerManager } from './player.js';
 import { GhostManager } from './ghost.js';
@@ -21,6 +22,24 @@ function fitToViewport(canvas: HTMLCanvasElement): void {
   canvas.style.height = `${Math.round(canvas.height * scale)}px`;
 }
 
+function setupDpad(inputMgr: InputManager): void {
+  const buttons: Array<[string, Direction]> = [
+    ['btn-up', 'UP'],
+    ['btn-down', 'DOWN'],
+    ['btn-left', 'LEFT'],
+    ['btn-right', 'RIGHT'],
+  ];
+  for (const [id, dir] of buttons) {
+    const btn = document.getElementById(id);
+    if (!btn) continue;
+    btn.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      inputMgr.pushDirection(dir);
+    }, { passive: false });
+    btn.addEventListener('mousedown', () => inputMgr.pushDirection(dir));
+  }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   const canvas = document.getElementById('gameCanvas') as HTMLCanvasElement | null;
   if (!canvas) throw new Error('Canvas element not found');
@@ -35,6 +54,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   fitToViewport(canvas);
   window.addEventListener('resize', () => fitToViewport(canvas));
+  setupDpad(inputMgr);
 
   const loop = new GameLoop(map, player, ghostMgr, renderer, inputMgr, audio, storage);
   loop.start();

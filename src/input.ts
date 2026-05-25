@@ -87,6 +87,10 @@ export class InputManager {
     return this.buffered;
   }
 
+  pushDirection(dir: Direction): void {
+    this.buffered = dir;
+  }
+
   destroy(): void {
     window.removeEventListener('keydown', this.boundKeyDown);
     window.removeEventListener('touchstart', this.boundTouchStart);

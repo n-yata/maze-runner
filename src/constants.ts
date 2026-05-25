@@ -8,8 +8,8 @@ export const CANVAS_WIDTH = COLS * TILE_SIZE;
 export const CANVAS_HEIGHT = (ROWS + 4) * TILE_SIZE; // extra rows for score UI
 
 export const PLAYER_SPEED = 5.5; // tiles per second
-export const GHOST_SPEED = 6.5;
-export const FRIGHTENED_SPEED = 4.0;
+export const GHOST_SPEED = 4.5;  // プレイヤー(5.5)より少し遅く
+export const FRIGHTENED_SPEED = 3.0;
 export const EATEN_SPEED = 12.0;
 
 export const FRIGHTENED_DURATION = 6.0; // seconds

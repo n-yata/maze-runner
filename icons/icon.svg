@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#000"/>
+  <!-- border walls -->
+  <rect x="0" y="0" width="512" height="28" fill="#0000CC"/>
+  <rect x="0" y="484" width="512" height="28" fill="#0000CC"/>
+  <rect x="0" y="0" width="28" height="512" fill="#0000CC"/>
+  <rect x="484" y="0" width="28" height="512" fill="#0000CC"/>
+  <!-- inner walls -->
+  <rect x="56" y="56" width="140" height="24" fill="#0000CC"/>
+  <rect x="316" y="56" width="140" height="24" fill="#0000CC"/>
+  <rect x="56" y="160" width="140" height="24" fill="#0000CC"/>
+  <rect x="316" y="160" width="140" height="24" fill="#0000CC"/>
+  <rect x="56" y="56" width="24" height="128" fill="#0000CC"/>
+  <rect x="432" y="56" width="24" height="128" fill="#0000CC"/>
+  <!-- middle wall block -->
+  <rect x="176" y="220" width="160" height="24" fill="#0000CC"/>
+  <rect x="176" y="268" width="160" height="24" fill="#0000CC"/>
+  <rect x="176" y="220" width="24" height="72" fill="#0000CC"/>
+  <rect x="312" y="220" width="24" height="72" fill="#0000CC"/>
+  <!-- dots -->
+  <circle cx="100" cy="108" r="10" fill="#FFB8AE"/>
+  <circle cx="256" cy="108" r="10" fill="#FFB8AE"/>
+  <circle cx="412" cy="108" r="10" fill="#FFB8AE"/>
+  <circle cx="100" cy="200" r="10" fill="#FFB8AE"/>
+  <circle cx="412" cy="200" r="10" fill="#FFB8AE"/>
+  <!-- power dots -->
+  <circle cx="72" cy="108" r="16" fill="#FFB8AE"/>
+  <circle cx="440" cy="108" r="16" fill="#FFB8AE"/>
+  <!-- PAC-MAN (facing right) -->
+  <path d="M220 350 L310 308 A90 90 0 1 0 310 392 Z" fill="#FFE000"/>
+  <!-- Ghost -->
+  <g transform="translate(340,310)">
+    <path d="M0 0 A36 36 0 0 1 72 0 L72 60 L60 48 L48 60 L36 48 L24 60 L12 48 L0 60 Z" fill="#FF0000"/>
+    <circle cx="22" cy="22" r="9" fill="white"/>
+    <circle cx="50" cy="22" r="9" fill="white"/>
+    <circle cx="25" cy="24" r="5" fill="#00F"/>
+    <circle cx="53" cy="24" r="5" fill="#00F"/>
+  </g>
+</svg>
