@@ -38,6 +38,7 @@ jobs:
           cp manifest.json _site/
           cp service-worker.js _site/
           cp -r dist _site/
+          cp -r icons _site/
 
       - uses: actions/upload-pages-artifact@v3
         with:
