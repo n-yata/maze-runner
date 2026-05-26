@@ -75,17 +75,11 @@ export class Renderer {
         this.drawDeadPlayer(player, state.phaseTimer);
         break;
 
-      case 'STAGE_CLEAR': {
-        const flashOn = Math.floor(state.phaseTimer / 0.25) % 2 === 0;
-        if (flashOn) {
-          map.drawToFlash(ctx, MAP_OFFSET_Y, '#FFFFFF', '#CCCCCC');
-        } else {
-          map.drawTo(ctx, MAP_OFFSET_Y);
-        }
+      case 'STAGE_CLEAR':
+        map.drawTo(ctx, MAP_OFFSET_Y);
         map.drawDots(ctx, MAP_OFFSET_Y);
         this.drawStageClear();
         break;
-      }
 
       case 'ALL_CLEAR':
         map.drawTo(ctx, MAP_OFFSET_Y);

@@ -167,23 +167,6 @@ export class MapManager {
     }
   }
 
-  drawToFlash(ctx: CanvasRenderingContext2D, offsetY: number, wallColor: string, wallInnerColor: string): void {
-    ctx.fillStyle = COLORS.BACKGROUND;
-    ctx.fillRect(0, offsetY, COLS * TILE_SIZE, ROWS * TILE_SIZE);
-    for (let row = 0; row < ROWS; row++) {
-      for (let col = 0; col < COLS; col++) {
-        if (this.tileAt(col, row) === 1) {
-          const x = col * TILE_SIZE;
-          const y = row * TILE_SIZE + offsetY;
-          ctx.fillStyle = wallColor;
-          ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
-          ctx.fillStyle = wallInnerColor;
-          ctx.fillRect(x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 4);
-        }
-      }
-    }
-  }
-
   drawDots(ctx: CanvasRenderingContext2D, offsetY: number): void {
     for (let row = 0; row < ROWS; row++) {
       for (let col = 0; col < COLS; col++) {
