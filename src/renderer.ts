@@ -75,11 +75,17 @@ export class Renderer {
         this.drawDeadPlayer(player, state.phaseTimer);
         break;
 
-      case 'STAGE_CLEAR':
-        map.drawTo(ctx, MAP_OFFSET_Y);
+      case 'STAGE_CLEAR': {
+        const flashOn = Math.floor(state.phaseTimer / 0.25) % 2 === 0;
+        if (flashOn) {
+          map.drawToFlash(ctx, MAP_OFFSET_Y, '#FFFFFF', '#CCCCCC');
+        } else {
+          map.drawTo(ctx, MAP_OFFSET_Y);
+        }
         map.drawDots(ctx, MAP_OFFSET_Y);
         this.drawStageClear();
         break;
+      }
 
       case 'ALL_CLEAR':
         map.drawTo(ctx, MAP_OFFSET_Y);
@@ -163,18 +169,31 @@ export class Renderer {
       return;
     }
 
-    // 0.3-1.5s: 口が全開から閉じ、最後は点に縮む
-    const progress = Math.min((timer - 0.3) / 1.2, 1.0);
-    const currentRadius = radius * (1 - progress * 0.8);
-    const mouthOpen = (1 - progress) * Math.PI; // π → 0
+    // 0.3-0.9s: 高速スピン（2回転）
+    if (timer < 0.9) {
+      const spinProgress = (timer - 0.3) / 0.6;
+      const angle = spinProgress * Math.PI * 4;
+      ctx.save();
+      ctx.translate(px, py);
+      ctx.rotate(angle);
+      ctx.fillStyle = COLORS.PLAYER;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.arc(0, 0, radius, 0.25 * Math.PI, 1.75 * Math.PI);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+      return;
+    }
 
+    // 0.9-1.5s: 縮んで消える
+    const shrinkProgress = Math.min((timer - 0.9) / 0.6, 1.0);
+    const currentRadius = radius * (1 - shrinkProgress);
     if (currentRadius < 1) return;
 
     ctx.fillStyle = COLORS.PLAYER;
     ctx.beginPath();
-    ctx.moveTo(px, py);
-    ctx.arc(px, py, currentRadius, mouthOpen / 2, Math.PI * 2 - mouthOpen / 2);
-    ctx.closePath();
+    ctx.arc(px, py, currentRadius, 0, Math.PI * 2);
     ctx.fill();
   }
 
