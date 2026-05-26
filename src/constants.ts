@@ -66,6 +66,17 @@ export const COLORS = {
   LIFE_COLOR:  '#FFE000',
 } as const;
 
+export const STAGE_WALL_COLORS = [
+  { wall: '#0000FF', inner: '#000088' }, // Stage 1: Blue
+  { wall: '#007700', inner: '#004400' }, // Stage 2: Green
+  { wall: '#AA0000', inner: '#660000' }, // Stage 3: Red
+] as const;
+
+export function getStageColors(level: number): { wall: string; inner: string } {
+  const idx = Math.max(0, Math.min(level - 1, STAGE_WALL_COLORS.length - 1));
+  return STAGE_WALL_COLORS[idx]!;
+}
+
 export const SCORE = {
   DOT:         10,
   POWER_DOT:   50,

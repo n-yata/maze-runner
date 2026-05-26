@@ -1,5 +1,5 @@
 import type { Vec2, TileType } from './types.js';
-import { COLS, ROWS, TILE_SIZE, COLORS } from './constants.js';
+import { COLS, ROWS, TILE_SIZE, COLORS, getStageColors } from './constants.js';
 
 // 0=EMPTY, 1=WALL, 2=DOT, 3=POWER_DOT, 4=TUNNEL
 // prettier-ignore
@@ -120,6 +120,8 @@ export class MapManager {
   private dotState: boolean[]; // true = dot/power still present
   private totalDots: number;
   private offscreen: OffscreenCanvas | null = null;
+  private wallColor: string = getStageColors(1).wall;
+  private wallInnerColor: string = getStageColors(1).inner;
 
   constructor() {
     this.tiles = MAP_DATA_1.map(v => v as TileType);
@@ -147,9 +149,9 @@ export class MapManager {
         const y = row * TILE_SIZE;
 
         if (tile === 1) {
-          ctx.fillStyle = COLORS.WALL;
+          ctx.fillStyle = this.wallColor;
           ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
-          ctx.fillStyle = COLORS.WALL_INNER;
+          ctx.fillStyle = this.wallInnerColor;
           ctx.fillRect(x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 4);
         }
       }
@@ -242,6 +244,9 @@ export class MapManager {
     this.tiles = data.map(v => v as TileType);
     this.dotState = this.tiles.map(t => t === 2 || t === 3);
     this.totalDots = this.dotState.filter(Boolean).length;
+    const colors = getStageColors(level);
+    this.wallColor = colors.wall;
+    this.wallInnerColor = colors.inner;
     this.buildOffscreenCanvas();
   }
 
