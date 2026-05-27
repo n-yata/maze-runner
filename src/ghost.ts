@@ -164,27 +164,39 @@ export class GhostManager {
         }
       }
 
-      // Check collision with player
-      if (g.mode !== 'EATEN') {
-        const playerTile = player.getTilePos();
-        const ghostTile = g.pos;
-        if (playerTile.x === ghostTile.x && playerTile.y === ghostTile.y) {
-          if (g.mode === 'FRIGHTENED') {
-            // Ghost eaten
-            const eatIdx = Math.min(g.eatenScore, GHOST_EAT_SCORES.length - 1);
-            scoreGained += GHOST_EAT_SCORES[eatIdx] ?? 200;
-            g.eatenScore++;
-            g.mode = 'EATEN';
-            audio.play('EAT_GHOST');
-          } else {
-            // Player dies
-            player.die();
-            audio.play('DEATH');
-          }
+      const checkCollision = (): boolean => {
+        if (g.mode === 'EATEN') return false;
+        const playerPx = player.getPixelPos();
+        const cdx = g.pixelPos.x - playerPx.x;
+        const cdy = g.pixelPos.y - playerPx.y;
+        const threshold = TILE_SIZE * 0.75;
+        return cdx * cdx + cdy * cdy < threshold * threshold;
+      };
+
+      const handleCollision = (): void => {
+        if (g.mode === 'FRIGHTENED') {
+          const eatIdx = Math.min(g.eatenScore, GHOST_EAT_SCORES.length - 1);
+          scoreGained += GHOST_EAT_SCORES[eatIdx] ?? 200;
+          g.eatenScore++;
+          g.mode = 'EATEN';
+          audio.play('EAT_GHOST');
+        } else {
+          player.die();
+          audio.play('DEATH');
         }
+      };
+
+      // Check collision before moving
+      if (checkCollision()) {
+        handleCollision();
       }
 
       this.moveGhost(g, dt, map, player, blinky);
+
+      // Check collision after moving to catch pass-through in same frame
+      if (!player.state.isDead && checkCollision()) {
+        handleCollision();
+      }
     }
 
     return scoreGained;
@@ -270,6 +282,11 @@ export class GhostManager {
         bestDist = d;
         bestDir = dir;
       }
+    }
+
+    // Dead end: all forward directions blocked, allow reversal to avoid wall penetration
+    if (bestDist === Infinity) {
+      return opp;
     }
 
     return bestDir;

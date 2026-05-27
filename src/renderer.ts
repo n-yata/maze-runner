@@ -240,27 +240,26 @@ export class Renderer {
   }
 
   private drawFruit(fruitMgr: FruitManager): void {
-    const state = fruitMgr.getState();
-    if (!state) return;
-
-    // Flash in last 3 seconds (0.25s on/off cycle)
-    if (state.timer < 3.0 && Math.floor(state.timer / 0.25) % 2 === 0) return;
-
     const ctx = this.ctx;
-    const cx = state.col * TILE_SIZE + TILE_SIZE / 2;
-    const cy = state.row * TILE_SIZE + TILE_SIZE / 2 + MAP_OFFSET_Y;
-    const r = TILE_SIZE / 2 - 1;
+    for (const state of fruitMgr.getStates()) {
+      // Flash in last 3 seconds (0.25s on/off cycle)
+      if (state.timer < 3.0 && Math.floor(state.timer / 0.25) % 2 === 0) continue;
 
-    const def = getFruitDef(state.level);
-    ctx.fillStyle = def.color;
-    ctx.beginPath();
-    ctx.arc(cx, cy, r, 0, Math.PI * 2);
-    ctx.fill();
+      const cx = state.col * TILE_SIZE + TILE_SIZE / 2;
+      const cy = state.row * TILE_SIZE + TILE_SIZE / 2 + MAP_OFFSET_Y;
+      const r = TILE_SIZE / 2 - 1;
 
-    ctx.fillStyle = 'rgba(255,255,255,0.55)';
-    ctx.beginPath();
-    ctx.arc(cx - r * 0.3, cy - r * 0.35, r * 0.3, 0, Math.PI * 2);
-    ctx.fill();
+      const def = getFruitDef(state.level);
+      ctx.fillStyle = def.color;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = 'rgba(255,255,255,0.55)';
+      ctx.beginPath();
+      ctx.arc(cx - r * 0.3, cy - r * 0.35, r * 0.3, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
 
   private drawEyes(cx: number, cy: number, r: number): void {

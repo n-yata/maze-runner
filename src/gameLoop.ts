@@ -1,4 +1,4 @@
-import type { GameState } from './types.js';
+import type { GameState, Vec2 } from './types.js';
 import { INITIAL_LIVES, MAX_LEVEL, getLevelParams } from './constants.js';
 import type { MapManager } from './map.js';
 import type { PlayerManager } from './player.js';
@@ -24,6 +24,8 @@ export class GameLoop {
   private lastTime = 0;
   private rafId = 0;
   private lastPowerDotCount = -1;
+  private validFruitPositionsCache: Vec2[] = [];
+  private fruitPosCacheDotsEaten = -1;
   private readonly boundLoop: FrameRequestCallback;
 
   constructor(
@@ -226,7 +228,11 @@ export class GameLoop {
     const ghostScore = this.ghostMgr.update(dt, this.map, this.player, this.audio, this.state.dotsEaten);
     this.state.score += ghostScore;
 
-    this.fruitMgr.checkSpawn(this.state.dotsEaten, this.state.level);
+    if (this.state.dotsEaten !== this.fruitPosCacheDotsEaten) {
+      this.validFruitPositionsCache = this.map.getValidFruitPositions();
+      this.fruitPosCacheDotsEaten = this.state.dotsEaten;
+    }
+    this.fruitMgr.checkSpawn(this.state.dotsEaten, this.state.level, this.validFruitPositionsCache);
     const fruitScore = this.fruitMgr.update(dt, this.player.getPixelPos());
     if (fruitScore > 0) {
       this.state.score += fruitScore;

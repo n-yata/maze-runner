@@ -117,4 +117,25 @@ describe('MapManager', () => {
       expect(map.wrapCol(14)).toBe(14);
     });
   });
+
+  describe('getValidFruitPositions', () => {
+    it('returns a non-empty list for the default stage', () => {
+      const positions = map.getValidFruitPositions();
+      expect(positions.length).toBeGreaterThan(0);
+    });
+
+    it('all returned positions are DOT tiles (not wall, not empty, not tunnel)', () => {
+      const positions = map.getValidFruitPositions();
+      for (const pos of positions) {
+        expect(map.isWall(pos.x, pos.y)).toBe(false);
+        expect(map.isTunnel(pos.x, pos.y)).toBe(false);
+      }
+    });
+
+    it('does not include any wall positions', () => {
+      const positions = map.getValidFruitPositions();
+      const wallFound = positions.some(p => map.isWall(p.x, p.y));
+      expect(wallFound).toBe(false);
+    });
+  });
 });

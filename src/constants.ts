@@ -107,9 +107,9 @@ const FRUIT_TABLE: FruitDef[] = [
   { color: '#22BB44', score: 1000 }, // Level 5+: Melon
 ];
 
-export const FRUIT_SPAWN_THRESHOLDS = [70, 170] as const;
-export const FRUIT_DURATION = 10.0;
-export const FRUIT_SPAWN_POS: Vec2 = { x: 13, y: 17 };
+export const FRUIT_SPAWN_THRESHOLDS = [47, 113] as const;
+export const FRUIT_DURATION = 15.0;
+export const FRUIT_MAX_ACTIVE = 2;
 
 export function getFruitDef(level: number): FruitDef {
   const idx = Math.max(0, Math.min(level - 1, FRUIT_TABLE.length - 1));

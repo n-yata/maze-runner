@@ -256,6 +256,20 @@ export class MapManager {
     return t !== 1;
   }
 
+  // Use DOT tile positions (type=2) regardless of dotState — fruits spawn on corridors,
+  // not restricted to tiles that still have dots present.
+  getValidFruitPositions(): Vec2[] {
+    const positions: Vec2[] = [];
+    for (let row = 0; row < ROWS; row++) {
+      for (let col = 0; col < COLS; col++) {
+        if (this.tileAt(col, row) === 2) {
+          positions.push({ x: col, y: row });
+        }
+      }
+    }
+    return positions;
+  }
+
   wrapCol(col: number): number {
     if (col < 0) return COLS - 1;
     if (col >= COLS) return 0;
