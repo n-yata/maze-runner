@@ -1,8 +1,8 @@
 import type { GhostName, GhostMode, Vec2 } from './types.js';
 
-export const COLS = 21;
-export const ROWS = 37;
-export const TILE_SIZE = 16;
+export const COLS = 15;
+export const ROWS = 25;
+export const TILE_SIZE = 24;
 
 export const CANVAS_WIDTH = COLS * TILE_SIZE;
 export const CANVAS_HEIGHT = (ROWS + 4) * TILE_SIZE; // extra rows for score UI
@@ -14,19 +14,19 @@ export const EATEN_SPEED = 12.0;
 
 export const FRIGHTENED_DURATION = 6.0; // seconds
 
-export const PLAYER_START: Vec2 = { x: 10, y: 28 };
+export const PLAYER_START: Vec2 = { x: 7, y: 19 };
 
-export const GHOST_HOUSE_CENTER: Vec2 = { x: 10, y: 18 };
-export const GHOST_HOUSE_DOOR: Vec2 = { x: 10, y: 15 };
+export const GHOST_HOUSE_CENTER: Vec2 = { x: 7, y: 12 };
+export const GHOST_HOUSE_DOOR: Vec2 = { x: 7, y: 9 };
 
 // Column range of the ghost house interior+door (used to restrict non-EATEN ghosts from re-entering)
-export const GHOST_HOUSE_COLS: [number, number] = [8, 12];
+export const GHOST_HOUSE_COLS: [number, number] = [5, 9];
 
 export const GHOST_STARTS: Record<GhostName, Vec2> = {
-  BLINKY: { x: 10, y: 15 },
-  PINKY:  { x: 10, y: 18 },
-  INKY:   { x: 9,  y: 18 },
-  CLYDE:  { x: 11, y: 18 },
+  BLINKY: { x: 7, y: 9 },
+  PINKY:  { x: 7, y: 12 },
+  INKY:   { x: 6, y: 12 },
+  CLYDE:  { x: 8, y: 12 },
 };
 
 export const GHOST_SCATTER_TARGETS: Record<GhostName, Vec2> = {

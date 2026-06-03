@@ -34,9 +34,14 @@ function reachableTiles(map: MapManager): Set<string> {
 }
 
 describe('MapManager - グリッド寸法', () => {
-  it('盤面は縦長(COLS=21, ROWS=37)である', () => {
-    expect(COLS).toBe(21);
-    expect(ROWS).toBe(37);
+  it('盤面は縦長(COLS=15, ROWS=25)である', () => {
+    expect(COLS).toBe(15);
+    expect(ROWS).toBe(25);
+  });
+
+  it('縦長かつ左右対称が成立する寸法（ROWS>COLS・COLSは奇数）', () => {
+    expect(ROWS).toBeGreaterThan(COLS);
+    expect(COLS % 2).toBe(1);
   });
 });
 

@@ -3,16 +3,16 @@ import { COLS, ROWS, TILE_SIZE, COLORS, getStageColors } from './constants.js';
 
 // 0=EMPTY, 1=WALL, 2=DOT, 3=POWER_DOT, 4=TUNNEL
 //
-// 縦長(21×37)マップはコード生成する。構造的に連結性を保証する設計:
+// 縦長(15×25)マップはコード生成する。構造的に連結性を保証する設計:
 //  - 外周1マス内側のコリドーリング(row1 / row ROWS-2 / col1 / col COLS-2)を常に通路にする
-//  - 中央縦コリドー(col=doorCol=10)を常に通路にする（上下を貫く幹線）
+//  - 中央縦コリドー(col=doorCol=7)を常に通路にする（上下を貫く幹線）
 //  - 壁は「孤立したブロック」としてのみ内部に置く（リング・中央線・ゴーストハウス・トンネル行を避ける）
-//  - 左右対称: COLS=21(奇数)・中心列10。壁条件は列パリティ(c%2)依存で、mirror(20-c)もパリティ不変
+//  - 左右対称: COLS=15(奇数)・中心列7。壁条件は列パリティ(c%2)依存で、mirror(COLS-1-c)もパリティ不変
 // この構造は tests/unit/map.test.ts の flood-fill 連結性テストで検証する。
 
-const TUNNEL_ROW = 18;
+const TUNNEL_ROW = 12;
 const HOUSE: { top: number; bottom: number; left: number; right: number; doorCol: number } =
-  { top: 16, bottom: 20, left: 8, right: 12, doorCol: 10 };
+  { top: 10, bottom: 14, left: 5, right: 9, doorCol: 7 };
 
 function inHouseBox(r: number, c: number): boolean {
   // ハウス本体＋外周1マス（壁ブロックを置かない安全マージン）
@@ -226,7 +226,7 @@ export class MapManager {
           ctx.fill();
         } else {
           // 通常ドット = エネルギー結晶（菱形）＋淡い発光
-          const s = 3;
+          const s = Math.round(TILE_SIZE / 5);
           ctx.save();
           ctx.shadowColor = COLORS.DOT;
           ctx.shadowBlur = 4;
