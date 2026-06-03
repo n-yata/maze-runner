@@ -1,0 +1,8 @@
+# ビルド成果物
+dist/
+
+# テストカバレッジレポート
+coverage/
+
+# パッケージロックファイル（Grepノイズ源）
+package-lock.json
