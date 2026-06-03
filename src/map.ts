@@ -22,28 +22,31 @@ function inHouseBox(r: number, c: number): boolean {
   );
 }
 
-/** 内部の壁ブロック判定（孤立ブロックのみ）。ステージごとに密度・形状を変える。 */
-function isPillar(level: number, r: number, c: number): boolean {
-  // コリドーリングより内側のみ
-  if (r < 2 || r > ROWS - 3 || c < 2 || c > COLS - 3) return false;
-  if (r === TUNNEL_ROW) return false;       // トンネル行は開けておく
-  if (c === HOUSE.doorCol) return false;     // 中央縦コリドー（幹線）は常に開ける
-  if (inHouseBox(r, c)) return false;        // ゴーストハウス周辺は開ける
+// 太い壁ブロック（幅2）を格子状に並べ、その間を幅1の連続コリドーが縦横に走る「碁盤の目」迷路。
+// 縦の大通りは cols {1,4,7,10,13} に全長通し、横通路は一定間隔で通る → 直進と交差点中心の素直な操作性。
+// 列ピッチ pc=3・島幅 w=2・開始列 startC=2 は COLS=15 で左右対称（中心列 doorCol=7 は常に通路）。
+// 島を縦に長くするほど横通路が減り通路（＝エサ）が減る（ステージが進むほど難化）。
+function islandParams(level: number): { w: number; h: number; pr: number; pc: number } {
+  if (level <= 1) return { w: 2, h: 3, pr: 4, pc: 3 };  // 横通路は4行ごと
+  if (level === 2) return { w: 2, h: 4, pr: 5, pc: 3 };
+  return { w: 2, h: 5, pr: 6, pc: 3 };                  // Stage3: 横通路最少
+}
 
-  const grid = r % 2 === 0 && c % 2 === 0;   // 偶数×偶数の格子点
-  if (!grid) return false;
+const ISLAND_START_R = 2;
+const ISLAND_START_C = 2;
 
-  if (level === 1) {
-    // Stage1: 開放的（格子点を1行おきに間引く）
-    return r % 4 === 2;
-  }
-  if (level === 2) {
-    // Stage2: 標準的な格子
-    return true;
-  }
-  // Stage3: 格子＋縦バー延長（迷路感）。延長部も格子点に隣接する孤立形状を保つ
-  if (r % 2 === 0 && c % 2 === 0) return true;
-  return false;
+/** (r,c) が壁ブロックのセルか。コリドーリング・中央縦コリドー・ハウス・トンネル行は除外（=通路）。 */
+function isIslandCell(level: number, r: number, c: number): boolean {
+  if (r < ISLAND_START_R || r > ROWS - 3) return false; // 上下のリング行は通路
+  if (c < ISLAND_START_C || c > COLS - 3) return false; // 左右のリング列は通路
+  if (r === TUNNEL_ROW) return false;     // トンネル行は通路
+  if (c === HOUSE.doorCol) return false;  // 中央縦コリドー（幹線）は通路
+  if (inHouseBox(r, c)) return false;     // ゴーストハウス周辺は通路
+
+  const { w, h, pr, pc } = islandParams(level);
+  const rr = (r - ISLAND_START_R) % pr;
+  const cc = (c - ISLAND_START_C) % pc;
+  return rr < h && cc < w; // 各周期の先頭 h×w セルが壁ブロック、残りが幅1コリドー
 }
 
 function buildTiles(level: number): TileType[] {
@@ -59,22 +62,10 @@ function buildTiles(level: number): TileType[] {
     }
   }
 
-  // 内部の壁ブロック
+  // 内部の壁島（矩形ブロックを格子状に配置、間に1マスコリドー）
   for (let r = 1; r < ROWS - 1; r++) {
     for (let c = 1; c < COLS - 1; c++) {
-      if (isPillar(level, r, c)) t[idx(c, r)] = 1;
-    }
-  }
-
-  // Stage3 は縦バーを足して迷路感を強める（孤立を保つよう格子点の1つ下のみ）
-  if (level >= 3) {
-    for (let r = 2; r < ROWS - 3; r++) {
-      for (let c = 2; c < COLS - 2; c++) {
-        if (r % 4 === 0 && c % 2 === 0 && c !== HOUSE.doorCol &&
-            r !== TUNNEL_ROW && !inHouseBox(r, c) && !inHouseBox(r + 1, c)) {
-          t[idx(c, r + 1)] = 1; // 既存格子点(r,c)の真下を壁にして 1×2 縦バー化
-        }
-      }
+      if (isIslandCell(level, r, c)) t[idx(c, r)] = 1;
     }
   }
 
