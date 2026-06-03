@@ -1,5 +1,6 @@
 import type { GameState, Vec2 } from './types.js';
-import { INITIAL_LIVES, MAX_LEVEL, getLevelParams } from './constants.js';
+import { INITIAL_LIVES, MAX_LEVEL, getLevelParams, COLORS, getFruitDef } from './constants.js';
+import { ParticleSystem } from './particles.js';
 import type { MapManager } from './map.js';
 import type { PlayerManager } from './player.js';
 import type { GhostManager } from './ghost.js';
@@ -24,6 +25,7 @@ export class GameLoop {
   private lastTime = 0;
   private rafId = 0;
   private lastPowerDotCount = -1;
+  private particles = new ParticleSystem();
   private validFruitPositionsCache: Vec2[] = [];
   private fruitPosCacheDotsEaten = -1;
   private readonly boundLoop: FrameRequestCallback;
@@ -148,11 +150,13 @@ export class GameLoop {
       this.accumulator -= FIXED_TIMESTEP;
     }
 
-    this.renderer.render(this.state, this.map, this.player, this.ghostMgr, this.fruitMgr);
+    this.renderer.render(this.state, this.map, this.player, this.ghostMgr, this.fruitMgr, this.particles);
     this.rafId = requestAnimationFrame(this.boundLoop);
   }
 
   private update(dt: number): void {
+    this.particles.update(dt); // パーティクルは全フェーズで進行（スパークの余韻）
+
     switch (this.state.phase) {
       case 'TITLE':
         break;
@@ -215,9 +219,20 @@ export class GameLoop {
     const dir = this.input.consumeDirection();
     this.player.setNextDir(dir);
 
+    const remainingBefore = this.map.getRemainingDots();
+    const powerBefore = this.map.getPowerDotCount();
+
     this.player.update(dt, this.map, this.audio);
     this.state.score += this.player.score;
     this.player.resetScore();
+
+    // 取得スパーク（パワーエサ＞通常ドット）
+    const ppos = this.player.getPixelPos();
+    if (this.map.getPowerDotCount() < powerBefore) {
+      this.particles.spawnBurst(ppos.x, ppos.y, COLORS.POWER_DOT, 14, 90);
+    } else if (this.map.getRemainingDots() < remainingBefore) {
+      this.particles.spawnBurst(ppos.x, ppos.y, COLORS.DOT, 5, 45);
+    }
 
     this.state.dotsEaten = this.map.getTotalDots() - this.map.getRemainingDots();
 
@@ -227,6 +242,9 @@ export class GameLoop {
 
     const ghostScore = this.ghostMgr.update(dt, this.map, this.player, this.audio, this.state.dotsEaten);
     this.state.score += ghostScore;
+    if (ghostScore > 0) {
+      this.particles.spawnBurst(ppos.x, ppos.y, '#FFFFFF', 18, 110); // 撃破スパーク
+    }
 
     if (this.state.dotsEaten !== this.fruitPosCacheDotsEaten) {
       this.validFruitPositionsCache = this.map.getValidFruitPositions();
@@ -237,6 +255,7 @@ export class GameLoop {
     if (fruitScore > 0) {
       this.state.score += fruitScore;
       this.audio.play('EAT_FRUIT');
+      this.particles.spawnBurst(ppos.x, ppos.y, getFruitDef(this.state.level).color, 16, 100);
     }
 
     if (this.state.score > this.state.highScore) {

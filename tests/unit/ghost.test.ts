@@ -3,7 +3,7 @@ import { GhostManager } from '../../src/ghost.js';
 import { MapManager } from '../../src/map.js';
 import { PlayerManager } from '../../src/player.js';
 import { AudioManager } from '../../src/audio.js';
-import { GHOST_STARTS, GHOST_SCATTER_TARGETS, getLevelParams, TILE_SIZE } from '../../src/constants.js';
+import { GHOST_STARTS, GHOST_SCATTER_TARGETS, getLevelParams, TILE_SIZE, COLS, ROWS } from '../../src/constants.js';
 
 function makeDeps() {
   const map = new MapManager();
@@ -109,26 +109,26 @@ describe('GhostManager', () => {
 
   it('Blinky scatter target is top-right area', () => {
     const target = GHOST_SCATTER_TARGETS['BLINKY'];
-    expect(target.x).toBeGreaterThan(20);
+    expect(target.x).toBeGreaterThan(COLS / 2);
     expect(target.y).toBe(0);
   });
 
   it('Clyde scatter target is bottom-left area', () => {
     const target = GHOST_SCATTER_TARGETS['CLYDE'];
     expect(target.x).toBe(0);
-    expect(target.y).toBeGreaterThan(20);
+    expect(target.y).toBeGreaterThan(ROWS / 2);
   });
 
   it('Pinky scatter target is top-left area', () => {
     const target = GHOST_SCATTER_TARGETS['PINKY'];
-    expect(target.x).toBeLessThan(5);
+    expect(target.x).toBeLessThan(COLS / 2);
     expect(target.y).toBe(0);
   });
 
   it('Inky scatter target is bottom-right area', () => {
     const target = GHOST_SCATTER_TARGETS['INKY'];
-    expect(target.x).toBeGreaterThan(20);
-    expect(target.y).toBeGreaterThan(20);
+    expect(target.x).toBeGreaterThan(COLS / 2);
+    expect(target.y).toBeGreaterThan(ROWS / 2);
   });
 
   describe('update()', () => {

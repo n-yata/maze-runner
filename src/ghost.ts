@@ -1,10 +1,11 @@
 import type { GhostState, GhostName, GhostMode, Direction, Vec2 } from './types.js';
 import {
   TILE_SIZE,
+  COLS,
   GHOST_STARTS,
   GHOST_SCATTER_TARGETS,
-  GHOST_HOUSE_CENTER,
   GHOST_HOUSE_DOOR,
+  GHOST_HOUSE_COLS,
   GHOST_RELEASE_DOT_THRESHOLDS,
   GHOST_SPEED,
   FRIGHTENED_SPEED,
@@ -237,7 +238,7 @@ export class GhostManager {
     let newY = g.pixelPos.y + dy * dist;
 
     // Tunnel warp
-    const totalWidth = 28 * TILE_SIZE;
+    const totalWidth = COLS * TILE_SIZE;
     if (newX < 0) newX += totalWidth;
     if (newX >= totalWidth) newX -= totalWidth;
 
@@ -274,8 +275,11 @@ export class GhostManager {
       const nc = col + dx;
       const nr = row + dy;
       if (map.isWall(nc, nr)) continue;
-      // Restrict ghosts from entering ghost house unless EATEN
-      if (nr === GHOST_HOUSE_CENTER.y && nc >= 11 && nc <= 16 && g.mode !== 'EATEN') continue;
+      // 復活(EATEN)以外のゴーストはハウス上壁の隙間（ドア行）から再進入できない。
+      // 出口（上方向）は許可し、外からの下方向進入のみ禁止する。列範囲は GHOST_HOUSE_COLS で判定。
+      const doorGapRow = GHOST_HOUSE_DOOR.y + 1;
+      if (g.mode !== 'EATEN' && dir === 'DOWN' && nr === doorGapRow &&
+          nc >= GHOST_HOUSE_COLS[0] && nc <= GHOST_HOUSE_COLS[1]) continue;
 
       const d = dist2({ x: nc, y: nr }, target);
       if (d < bestDist) {

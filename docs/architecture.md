@@ -96,11 +96,20 @@ dist/
 ├── player.js
 ├── ghost.js
 ├── renderer.js
+├── background.js   # 星空・星雲・視差（全画面背景、GameState非依存の純粋視覚）
+├── particles.js    # 取得/撃破スパーク（固定プール）
 ├── input.js
 ├── audio.js
 ├── storage.js
 └── gameLoop.js
 ```
+
+### 盤面グリッド
+
+盤面は **縦長 21列 × 37行（+ UI 4行）= 336×656px（アスペクト比 ≒0.51）** で、スマホ縦持ちに最適化している。
+`COLS/ROWS/CANVAS_*` と各種位置（`PLAYER_START`・`GHOST_HOUSE_*`・`GHOST_SCATTER_TARGETS`・`TUNNEL_COLS`）は
+`constants.ts` を単一の真実として集約し、`map.ts`/`ghost.ts`/`player.ts`/`renderer.ts` はすべてこれを参照する。
+盤面外の余白（スマホ上下・PC 左右）は全画面の星空背景キャンバスが埋める。
 
 **index.html** は `<script type="module" src="dist/main.js">` で読み込む。
 ES Modules をネイティブ使用するため、バンドラー不要。対応ブラウザ（Chrome 80+, Safari 14+, Firefox 75+）で動作。
@@ -247,7 +256,8 @@ document.addEventListener('pointerdown', () => {
 |------|---------|
 | レベル追加 | `constants.ts` にレベル別パラメータ（ゴースト速度・イジケ時間）を追加 |
 | 新ゴーストAI | `ghost.ts` に新クラスを追加し、`GhostManager` に登録 |
-| 新マップ | `map.ts` に新しい `TileType[][]` 配列を追加 |
+| 新マップ | `map.ts` の `buildTiles(level)` にステージ分岐を追加（コード生成＋連結性テストで検証） |
+| 新しい演出 | `background.ts`（背景）・`particles.ts`（エフェクト）は独立モジュールとして拡張・再利用可能 |
 | オンラインランキング | `StorageManager` をインターフェース化し、`LocalStorageAdapter` と `ApiAdapter` を切り替え可能に設計 |
 
 ---

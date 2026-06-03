@@ -7,6 +7,7 @@ import { FruitManager } from '../../src/fruit.js';
 import { InputManager } from '../../src/input.js';
 import { AudioManager } from '../../src/audio.js';
 import { StorageManager } from '../../src/storage.js';
+import { COLS, ROWS } from '../../src/constants.js';
 
 // Minimal Renderer stub that satisfies the type without touching Canvas
 class StubRenderer {
@@ -181,8 +182,8 @@ describe('GameLoop – phase transitions', () => {
     state(loop).phase = 'PLAYING';
 
     // Eat all dots
-    for (let col = 0; col < 28; col++) {
-      for (let row = 0; row < 31; row++) {
+    for (let col = 0; col < COLS; col++) {
+      for (let row = 0; row < ROWS; row++) {
         map.eatDot(col, row);
       }
     }

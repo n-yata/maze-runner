@@ -1,4 +1,4 @@
-const CACHE_NAME = 'mazerun-v3';
+const CACHE_NAME = 'mazerun-v4';
 const PRECACHE_ASSETS = [
   './',
   './index.html',
@@ -14,6 +14,8 @@ const PRECACHE_ASSETS = [
   './dist/ghost.js',
   './dist/fruit.js',
   './dist/renderer.js',
+  './dist/background.js',
+  './dist/particles.js',
   './dist/input.js',
   './dist/audio.js',
   './dist/storage.js',

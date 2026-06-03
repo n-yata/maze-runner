@@ -1,141 +1,193 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { MapManager } from '../../src/map.js';
+import { COLS, ROWS, PLAYER_START, GHOST_HOUSE_CENTER } from '../../src/constants.js';
 
-describe('MapManager', () => {
+const STAGES = [1, 2, 3];
+
+/** プレイヤー初期位置から壁以外を flood-fill し、到達できたタイル集合を返す（トンネルワープ込み）。 */
+function reachableTiles(map: MapManager): Set<string> {
+  const key = (c: number, r: number) => `${c},${r}`;
+  const visited = new Set<string>();
+  const stack: Array<[number, number]> = [[PLAYER_START.x, PLAYER_START.y]];
+  visited.add(key(PLAYER_START.x, PLAYER_START.y));
+
+  while (stack.length > 0) {
+    const [c, r] = stack.pop()!;
+    const neighbors: Array<[number, number]> = [
+      [c + 1, r], [c - 1, r], [c, r + 1], [c, r - 1],
+    ];
+    // トンネルワープ: 端のトンネルタイルは反対側の端へ繋がる
+    if (map.isTunnel(c, r)) {
+      if (c === 0) neighbors.push([COLS - 1, r]);
+      if (c === COLS - 1) neighbors.push([0, r]);
+    }
+    for (const [nc, nr] of neighbors) {
+      if (nc < 0 || nc >= COLS || nr < 0 || nr >= ROWS) continue;
+      if (map.isWall(nc, nr)) continue;
+      const k = key(nc, nr);
+      if (visited.has(k)) continue;
+      visited.add(k);
+      stack.push([nc, nr]);
+    }
+  }
+  return visited;
+}
+
+describe('MapManager - グリッド寸法', () => {
+  it('盤面は縦長(COLS=21, ROWS=37)である', () => {
+    expect(COLS).toBe(21);
+    expect(ROWS).toBe(37);
+  });
+});
+
+describe.each(STAGES)('MapManager - ステージ %i の構造', (level) => {
+  let map: MapManager;
+
+  beforeEach(() => {
+    map = new MapManager();
+    map.reset(level);
+  });
+
+  it('外周は壁で囲まれている', () => {
+    for (let c = 0; c < COLS; c++) {
+      expect(map.isWall(c, 0)).toBe(true);
+      expect(map.isWall(c, ROWS - 1)).toBe(true);
+    }
+    for (let r = 0; r < ROWS; r++) {
+      // 端の列はトンネル行を除いて壁
+      if (!map.isTunnel(0, r)) expect(map.isWall(0, r)).toBe(true);
+      if (!map.isTunnel(COLS - 1, r)) expect(map.isWall(COLS - 1, r)).toBe(true);
+    }
+  });
+
+  it('左右対称である', () => {
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        expect(map.tileAt(c, r)).toBe(map.tileAt(COLS - 1 - c, r));
+      }
+    }
+  });
+
+  it('トンネルが両端に存在する', () => {
+    let leftTunnel = false;
+    let rightTunnel = false;
+    for (let r = 0; r < ROWS; r++) {
+      if (map.isTunnel(0, r)) leftTunnel = true;
+      if (map.isTunnel(COLS - 1, r)) rightTunnel = true;
+    }
+    expect(leftTunnel).toBe(true);
+    expect(rightTunnel).toBe(true);
+  });
+
+  it('ゴーストハウス中心は通行可能', () => {
+    expect(map.isWall(GHOST_HOUSE_CENTER.x, GHOST_HOUSE_CENTER.y)).toBe(false);
+  });
+
+  it('プレイヤー初期位置は通行可能', () => {
+    expect(map.isWall(PLAYER_START.x, PLAYER_START.y)).toBe(false);
+  });
+
+  it('全てのドット/パワーエサがプレイヤー初期位置から到達可能（到達不能ドットなし）', () => {
+    const reachable = reachableTiles(map);
+    const unreachable: string[] = [];
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        if (map.isDot(c, r) || map.isPowerDot(c, r)) {
+          if (!reachable.has(`${c},${r}`)) unreachable.push(`(${c},${r})`);
+        }
+      }
+    }
+    expect(unreachable).toEqual([]);
+  });
+
+  it('ドットが十分に存在する（プレイ可能）', () => {
+    expect(map.getRemainingDots()).toBeGreaterThan(50);
+  });
+
+  it('パワーエサが存在する', () => {
+    expect(map.getPowerDotCount()).toBeGreaterThan(0);
+  });
+});
+
+describe('MapManager - ドット操作', () => {
   let map: MapManager;
 
   beforeEach(() => {
     map = new MapManager();
   });
 
-  describe('isWall', () => {
-    it('detects wall tiles at border', () => {
-      // Top-left corner is a wall
-      expect(map.isWall(0, 0)).toBe(true);
-    });
-
-    it('returns true for out-of-bounds coordinates', () => {
-      expect(map.isWall(-1, 0)).toBe(true);
-      expect(map.isWall(0, -1)).toBe(true);
-      expect(map.isWall(28, 0)).toBe(true);
-      expect(map.isWall(0, 31)).toBe(true);
-    });
-
-    it('returns false for passable tile', () => {
-      // Row 1, col 1 should be a dot (passable)
-      expect(map.isWall(1, 1)).toBe(false);
-    });
-  });
-
-  describe('isDot', () => {
-    it('returns true for initial dot tiles', () => {
-      // Row 1, col 1 has a dot initially
-      expect(map.isDot(1, 1)).toBe(true);
-    });
-
-    it('returns false after dot is eaten', () => {
-      map.eatDot(1, 1);
-      expect(map.isDot(1, 1)).toBe(false);
-    });
-
-    it('returns false for wall tile', () => {
-      expect(map.isDot(0, 0)).toBe(false);
-    });
-  });
-
-  describe('isPowerDot', () => {
-    it('returns true at power dot positions', () => {
-      // Row 3, col 1 has a power dot (value 3)
-      expect(map.isPowerDot(1, 3)).toBe(true);
-    });
-
-    it('returns false after power dot is eaten', () => {
-      map.eatDot(1, 3);
-      expect(map.isPowerDot(1, 3)).toBe(false);
-    });
-  });
-
-  describe('getRemainingDots', () => {
-    it('starts with a positive dot count', () => {
-      expect(map.getRemainingDots()).toBeGreaterThan(0);
-    });
-
-    it('decreases when a dot is eaten', () => {
-      const before = map.getRemainingDots();
-      map.eatDot(1, 1);
-      expect(map.getRemainingDots()).toBe(before - 1);
-    });
-
-    it('does not decrease if no dot at position', () => {
-      const before = map.getRemainingDots();
-      map.eatDot(0, 0); // wall tile — no dot
-      expect(map.getRemainingDots()).toBe(before);
-    });
-  });
-
-  describe('reset', () => {
-    it('restores eaten dots', () => {
-      const total = map.getTotalDots();
-      map.eatDot(1, 1);
-      map.eatDot(1, 3);
-      map.reset();
-      expect(map.getRemainingDots()).toBe(total);
-    });
-  });
-
-  describe('getPowerDotCount', () => {
-    it('returns positive count initially', () => {
-      expect(map.getPowerDotCount()).toBeGreaterThan(0);
-    });
-
-    it('decreases when a power dot is eaten', () => {
-      const before = map.getPowerDotCount();
-      map.eatDot(1, 3); // power dot position
-      expect(map.getPowerDotCount()).toBe(before - 1);
-    });
-
-    it('returns 0 after all power dots are eaten', () => {
-      // Eat all 4 power dot positions
-      map.eatDot(1, 3);
-      map.eatDot(26, 3);
-      map.eatDot(1, 23);
-      map.eatDot(26, 23);
-      expect(map.getPowerDotCount()).toBe(0);
-    });
-  });
-
-  describe('wrapCol', () => {
-    it('wraps negative column to right side', () => {
-      expect(map.wrapCol(-1)).toBe(27);
-    });
-
-    it('wraps column beyond max to 0', () => {
-      expect(map.wrapCol(28)).toBe(0);
-    });
-
-    it('returns same column for valid range', () => {
-      expect(map.wrapCol(14)).toBe(14);
-    });
-  });
-
-  describe('getValidFruitPositions', () => {
-    it('returns a non-empty list for the default stage', () => {
-      const positions = map.getValidFruitPositions();
-      expect(positions.length).toBeGreaterThan(0);
-    });
-
-    it('all returned positions are DOT tiles (not wall, not empty, not tunnel)', () => {
-      const positions = map.getValidFruitPositions();
-      for (const pos of positions) {
-        expect(map.isWall(pos.x, pos.y)).toBe(false);
-        expect(map.isTunnel(pos.x, pos.y)).toBe(false);
+  it('ドットを食べると残数が1減る', () => {
+    // 最初に見つかるドットを食べる
+    let target: [number, number] | null = null;
+    for (let r = 0; r < ROWS && !target; r++) {
+      for (let c = 0; c < COLS; c++) {
+        if (map.isDot(c, r)) { target = [c, r]; break; }
       }
-    });
+    }
+    expect(target).not.toBeNull();
+    const before = map.getRemainingDots();
+    map.eatDot(target![0], target![1]);
+    expect(map.getRemainingDots()).toBe(before - 1);
+  });
 
-    it('does not include any wall positions', () => {
-      const positions = map.getValidFruitPositions();
-      const wallFound = positions.some(p => map.isWall(p.x, p.y));
-      expect(wallFound).toBe(false);
-    });
+  it('壁の位置を食べても残数は変わらない', () => {
+    const before = map.getRemainingDots();
+    map.eatDot(0, 0); // wall
+    expect(map.getRemainingDots()).toBe(before);
+  });
+
+  it('reset で食べたドットが復活する', () => {
+    const total = map.getTotalDots();
+    let eaten = 0;
+    for (let r = 0; r < ROWS && eaten < 3; r++) {
+      for (let c = 0; c < COLS && eaten < 3; c++) {
+        if (map.isDot(c, r)) { map.eatDot(c, r); eaten++; }
+      }
+    }
+    map.reset();
+    expect(map.getRemainingDots()).toBe(total);
+  });
+});
+
+describe('MapManager - isWall 境界', () => {
+  let map: MapManager;
+  beforeEach(() => { map = new MapManager(); });
+
+  it('範囲外座標は壁扱い', () => {
+    expect(map.isWall(-1, 0)).toBe(true);
+    expect(map.isWall(0, -1)).toBe(true);
+    expect(map.isWall(COLS, 0)).toBe(true);
+    expect(map.isWall(0, ROWS)).toBe(true);
+  });
+});
+
+describe('MapManager - wrapCol', () => {
+  let map: MapManager;
+  beforeEach(() => { map = new MapManager(); });
+
+  it('負の列は右端に折り返す', () => {
+    expect(map.wrapCol(-1)).toBe(COLS - 1);
+  });
+  it('最大を超える列は0に折り返す', () => {
+    expect(map.wrapCol(COLS)).toBe(0);
+  });
+  it('有効範囲の列はそのまま', () => {
+    expect(map.wrapCol(10)).toBe(10);
+  });
+});
+
+describe('MapManager - getValidFruitPositions', () => {
+  let map: MapManager;
+  beforeEach(() => { map = new MapManager(); });
+
+  it('空でないリストを返す', () => {
+    expect(map.getValidFruitPositions().length).toBeGreaterThan(0);
+  });
+
+  it('返された位置は壁でもトンネルでもない', () => {
+    for (const pos of map.getValidFruitPositions()) {
+      expect(map.isWall(pos.x, pos.y)).toBe(false);
+      expect(map.isTunnel(pos.x, pos.y)).toBe(false);
+    }
   });
 });

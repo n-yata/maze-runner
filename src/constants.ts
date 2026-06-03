@@ -1,7 +1,7 @@
 import type { GhostName, GhostMode, Vec2 } from './types.js';
 
-export const COLS = 28;
-export const ROWS = 31;
+export const COLS = 21;
+export const ROWS = 37;
 export const TILE_SIZE = 16;
 
 export const CANVAS_WIDTH = COLS * TILE_SIZE;
@@ -14,23 +14,26 @@ export const EATEN_SPEED = 12.0;
 
 export const FRIGHTENED_DURATION = 6.0; // seconds
 
-export const PLAYER_START: Vec2 = { x: 13, y: 23 };
+export const PLAYER_START: Vec2 = { x: 10, y: 28 };
 
-export const GHOST_HOUSE_CENTER: Vec2 = { x: 13, y: 14 };
-export const GHOST_HOUSE_DOOR: Vec2 = { x: 13, y: 11 };
+export const GHOST_HOUSE_CENTER: Vec2 = { x: 10, y: 18 };
+export const GHOST_HOUSE_DOOR: Vec2 = { x: 10, y: 15 };
+
+// Column range of the ghost house interior+door (used to restrict non-EATEN ghosts from re-entering)
+export const GHOST_HOUSE_COLS: [number, number] = [8, 12];
 
 export const GHOST_STARTS: Record<GhostName, Vec2> = {
-  BLINKY: { x: 13, y: 11 },
-  PINKY:  { x: 13, y: 14 },
-  INKY:   { x: 11, y: 14 },
-  CLYDE:  { x: 15, y: 14 },
+  BLINKY: { x: 10, y: 15 },
+  PINKY:  { x: 10, y: 18 },
+  INKY:   { x: 9,  y: 18 },
+  CLYDE:  { x: 11, y: 18 },
 };
 
 export const GHOST_SCATTER_TARGETS: Record<GhostName, Vec2> = {
-  BLINKY: { x: 25, y: 0 },
+  BLINKY: { x: COLS - 3, y: 0 },
   PINKY:  { x: 2,  y: 0 },
-  INKY:   { x: 27, y: 30 },
-  CLYDE:  { x: 0,  y: 30 },
+  INKY:   { x: COLS - 1, y: ROWS - 1 },
+  CLYDE:  { x: 0,  y: ROWS - 1 },
 };
 
 // Mode schedule: alternating SCATTER/CHASE durations in seconds
@@ -72,12 +75,12 @@ export const COLORS = {
 } as const;
 
 export const STAGE_WALL_COLORS = [
-  { wall: '#2747C8', inner: '#0A1230' }, // Stage 1: 青コロニー
-  { wall: '#7A2BD0', inner: '#1E0A38' }, // Stage 2: 紫星雲
-  { wall: '#1FA89A', inner: '#06322D' }, // Stage 3: エイリアンの巣
+  { wall: '#2747C8', inner: '#0A1230', glow: '#5C8CFF' }, // Stage 1: 青コロニー
+  { wall: '#7A2BD0', inner: '#1E0A38', glow: '#C25CFF' }, // Stage 2: 紫星雲
+  { wall: '#1FA89A', inner: '#06322D', glow: '#46F0D8' }, // Stage 3: エイリアンの巣
 ] as const;
 
-export function getStageColors(level: number): { wall: string; inner: string } {
+export function getStageColors(level: number): { wall: string; inner: string; glow: string } {
   const idx = Math.max(0, Math.min(level - 1, STAGE_WALL_COLORS.length - 1));
   return STAGE_WALL_COLORS[idx]!;
 }
@@ -95,7 +98,7 @@ export const GHOST_EAT_SCORES = [200, 400, 800, 1600] as const;
 export const INITIAL_LIVES = 3;
 export const MAX_LEVEL = 3;
 
-export const TUNNEL_COLS = [0, 27]; // x-column indices that are tunnels
+export const TUNNEL_COLS = [0, COLS - 1]; // x-column indices that are tunnels
 
 export type { GhostMode };
 
