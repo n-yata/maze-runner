@@ -3,4 +3,7 @@ dist/
 *.js.map
 .DS_Store
 coverage/
+test-results/
+playwright-report/
+.playwright/
 .claude/settings.local.json

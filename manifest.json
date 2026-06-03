@@ -1,11 +1,11 @@
 {
-  "name": "迷宮ラン",
-  "short_name": "迷宮ラン",
-  "description": "PAC-MAN スタイルのブラウザゲーム",
+  "name": "ステラー・ラン",
+  "short_name": "ステラー・ラン",
+  "description": "宇宙を舞台にした迷路アクション・ブラウザゲーム",
   "start_url": "./",
   "display": "standalone",
-  "background_color": "#000000",
-  "theme_color": "#000000",
+  "background_color": "#05060F",
+  "theme_color": "#05060F",
   "orientation": "portrait",
   "icons": [
     {

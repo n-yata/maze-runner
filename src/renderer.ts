@@ -107,16 +107,59 @@ export class Renderer {
     ctx.font = `${TILE_SIZE - 4}px monospace`;
     ctx.fillText(`LV.${state.level}`, CANVAS_WIDTH - 6 * TILE_SIZE, TILE_SIZE * 3);
 
-    // Lives display
-    ctx.fillStyle = COLORS.LIFE_COLOR;
+    // Lives display（残機 = 宇宙船アイコン、上向き）
     for (let i = 0; i < state.lives; i++) {
       const lx = TILE_SIZE + 8 + i * (TILE_SIZE + 2);
       const ly = TILE_SIZE * 3;
+      ctx.save();
+      ctx.translate(lx, ly);
+      ctx.rotate(-Math.PI / 2); // 上向き
+      this.drawShipBody(TILE_SIZE / 2 - 1, 0);
+      ctx.restore();
+    }
+  }
+
+  /** 進行方向に対応する回転角(ラジアン)。RIGHT を 0 として時計回り。 */
+  private dirAngle(dir: string): number {
+    switch (dir) {
+      case 'RIGHT': return 0;
+      case 'DOWN':  return Math.PI / 2;
+      case 'LEFT':  return Math.PI;
+      case 'UP':    return -Math.PI / 2;
+      default:      return 0;
+    }
+  }
+
+  /** 宇宙船を中心(0,0)・右向き基準で描く。呼び出し側で translate/rotate 済み想定。 */
+  private drawShipBody(r: number, thrusterScale: number): void {
+    const ctx = this.ctx;
+
+    // 推進炎（後方=左側）
+    if (thrusterScale > 0) {
+      ctx.fillStyle = COLORS.SHIP_THRUSTER;
       ctx.beginPath();
-      ctx.arc(lx, ly, TILE_SIZE / 2 - 1, 0.25 * Math.PI, 1.75 * Math.PI);
-      ctx.lineTo(lx, ly);
+      ctx.moveTo(-r * 0.9, -r * 0.35);
+      ctx.lineTo(-r * (0.9 + thrusterScale * 0.9), 0);
+      ctx.lineTo(-r * 0.9, r * 0.35);
+      ctx.closePath();
       ctx.fill();
     }
+
+    // 船体（前方=右を向く三角形）
+    ctx.fillStyle = COLORS.PLAYER;
+    ctx.beginPath();
+    ctx.moveTo(r, 0);            // 機首
+    ctx.lineTo(-r * 0.85, -r * 0.8);
+    ctx.lineTo(-r * 0.5, 0);
+    ctx.lineTo(-r * 0.85, r * 0.8);
+    ctx.closePath();
+    ctx.fill();
+
+    // コックピット
+    ctx.fillStyle = COLORS.SHIP_COCKPIT;
+    ctx.beginPath();
+    ctx.arc(r * 0.15, 0, r * 0.28, 0, Math.PI * 2);
+    ctx.fill();
   }
 
   private drawPlayer(player: PlayerManager): void {
@@ -126,25 +169,14 @@ export class Renderer {
     const py = player.state.pixelPos.y + MAP_OFFSET_Y;
     const radius = TILE_SIZE / 2 - 1;
 
-    const mouthOpenness = Math.abs(Math.sin(player.state.animFrame * Math.PI));
-    const mouthAngle = mouthOpenness * 0.25 * Math.PI;
+    // 推進炎を animFrame で明滅
+    const thruster = 0.4 + 0.6 * Math.abs(Math.sin(player.state.animFrame * Math.PI));
 
-    const dir = player.state.dir;
-    let startAngle: number;
-    switch (dir) {
-      case 'RIGHT': startAngle = 0; break;
-      case 'DOWN':  startAngle = Math.PI / 2; break;
-      case 'LEFT':  startAngle = Math.PI; break;
-      case 'UP':    startAngle = -Math.PI / 2; break;
-      default:      startAngle = 0;
-    }
-
-    ctx.fillStyle = COLORS.PLAYER;
-    ctx.beginPath();
-    ctx.moveTo(px, py);
-    ctx.arc(px, py, radius, startAngle + mouthAngle, startAngle + Math.PI * 2 - mouthAngle);
-    ctx.closePath();
-    ctx.fill();
+    ctx.save();
+    ctx.translate(px, py);
+    ctx.rotate(this.dirAngle(player.state.dir));
+    this.drawShipBody(radius, thruster);
+    ctx.restore();
   }
 
   private drawDeadPlayer(player: PlayerManager, timer: number): void {
@@ -153,42 +185,44 @@ export class Renderer {
     const py = player.state.pixelPos.y + MAP_OFFSET_Y;
     const radius = TILE_SIZE / 2 - 1;
 
-    // 0-0.3s: フリーズ（通常表示）
+    // 0-0.3s: フリーズ（被弾した船を表示）
     if (timer < 0.3) {
-      ctx.fillStyle = COLORS.PLAYER;
-      ctx.beginPath();
-      ctx.arc(px, py, radius, 0.25 * Math.PI, 1.75 * Math.PI);
-      ctx.lineTo(px, py);
-      ctx.fill();
+      ctx.save();
+      ctx.translate(px, py);
+      this.drawShipBody(radius, 0);
+      ctx.restore();
       return;
     }
 
-    // 0.3-0.9s: 高速スピン（2回転）
+    // 0.3-0.9s: 制御を失った船が高速スピン（2回転）
     if (timer < 0.9) {
       const spinProgress = (timer - 0.3) / 0.6;
       const angle = spinProgress * Math.PI * 4;
       ctx.save();
       ctx.translate(px, py);
       ctx.rotate(angle);
-      ctx.fillStyle = COLORS.PLAYER;
-      ctx.beginPath();
-      ctx.moveTo(0, 0);
-      ctx.arc(0, 0, radius, 0.25 * Math.PI, 1.75 * Math.PI);
-      ctx.closePath();
-      ctx.fill();
+      this.drawShipBody(radius * (1 - spinProgress * 0.4), 0);
       ctx.restore();
       return;
     }
 
-    // 0.9-1.5s: 縮んで消える
-    const shrinkProgress = Math.min((timer - 0.9) / 0.6, 1.0);
-    const currentRadius = radius * (1 - shrinkProgress);
-    if (currentRadius < 1) return;
+    // 0.9-1.5s: 爆散（破片が放射状に飛び縮小）
+    const boomProgress = Math.min((timer - 0.9) / 0.6, 1.0);
+    if (boomProgress >= 1.0) return;
 
-    ctx.fillStyle = COLORS.PLAYER;
-    ctx.beginPath();
-    ctx.arc(px, py, currentRadius, 0, Math.PI * 2);
-    ctx.fill();
+    const shards = 6;
+    const spread = radius * (0.4 + boomProgress * 1.6);
+    const shardR = radius * 0.45 * (1 - boomProgress);
+    if (shardR < 0.5) return;
+    ctx.fillStyle = COLORS.SHIP_THRUSTER;
+    for (let i = 0; i < shards; i++) {
+      const a = (i / shards) * Math.PI * 2;
+      const sx = px + Math.cos(a) * spread;
+      const sy = py + Math.sin(a) * spread;
+      ctx.beginPath();
+      ctx.arc(sx, sy, shardR, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
 
   private drawGhosts(ghostMgr: GhostManager, frightenedEnding: boolean): void {
@@ -208,29 +242,58 @@ export class Renderer {
       return;
     }
 
-    if (g.mode === 'FRIGHTENED') {
+    const frightened = g.mode === 'FRIGHTENED';
+    let bodyColor: string;
+    if (frightened) {
       const flash = frightenedEnding && (Math.floor(Date.now() / 250) % 2 === 0);
-      ctx.fillStyle = flash ? COLORS.GHOST_FRIGHTENED_END : COLORS.GHOST_FRIGHTENED;
+      bodyColor = flash ? COLORS.GHOST_FRIGHTENED_END : COLORS.GHOST_FRIGHTENED;
     } else {
-      ctx.fillStyle = GHOST_COLORS[g.name];
+      bodyColor = GHOST_COLORS[g.name];
     }
 
+    // 触角（2本、先端に発光球）— stroke 設定を後続描画に漏らさないよう save/restore で閉じ込める
+    ctx.save();
+    ctx.strokeStyle = bodyColor;
+    ctx.lineWidth = 1.5;
+    for (const sx of [-r * 0.4, r * 0.4]) {
+      ctx.beginPath();
+      ctx.moveTo(px + sx * 0.6, py - r * 0.5);
+      ctx.lineTo(px + sx, py - r * 1.15);
+      ctx.stroke();
+      ctx.fillStyle = bodyColor;
+      ctx.beginPath();
+      ctx.arc(px + sx, py - r * 1.25, r * 0.18, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+
+    // 頭（ドーム）＋波打つ下端（触手）
+    ctx.fillStyle = bodyColor;
     ctx.beginPath();
     ctx.arc(px, py, r, Math.PI, 0);
     const bottom = py + r;
-    const segments = 3;
+    const segments = 4;
     const segW = (r * 2) / segments;
     for (let i = 0; i <= segments; i++) {
       const bx = px - r + i * segW;
-      const by = i % 2 === 0 ? bottom : bottom - r * 0.4;
+      const by = i % 2 === 0 ? bottom : bottom - r * 0.45;
       ctx.lineTo(bx, by);
     }
     ctx.closePath();
     ctx.fill();
 
-    if (g.mode !== 'FRIGHTENED') {
-      this.drawEyes(px, py, r);
+    if (!frightened) {
+      // 大きなエイリアンの目（1つ）＋瞳
+      ctx.fillStyle = '#FFFFFF';
+      ctx.beginPath();
+      ctx.arc(px, py - r * 0.05, r * 0.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#0A0A1A';
+      ctx.beginPath();
+      ctx.arc(px, py - r * 0.05, r * 0.24, 0, Math.PI * 2);
+      ctx.fill();
     } else {
+      // イジケ顔
       ctx.fillStyle = '#FFFFFF';
       ctx.beginPath();
       ctx.arc(px - r * 0.3, py - r * 0.1, 2, 0, Math.PI * 2);
@@ -250,14 +313,33 @@ export class Renderer {
       const r = TILE_SIZE / 2 - 1;
 
       const def = getFruitDef(state.level);
+
+      // グロー
+      ctx.fillStyle = def.color;
+      ctx.globalAlpha = 0.25;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r * 1.4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+
+      // 宇宙鉱石（クリスタル＝六角の菱形）
       ctx.fillStyle = def.color;
       ctx.beginPath();
-      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.moveTo(cx, cy - r);
+      ctx.lineTo(cx + r * 0.7, cy - r * 0.25);
+      ctx.lineTo(cx + r * 0.5, cy + r);
+      ctx.lineTo(cx - r * 0.5, cy + r);
+      ctx.lineTo(cx - r * 0.7, cy - r * 0.25);
+      ctx.closePath();
       ctx.fill();
 
-      ctx.fillStyle = 'rgba(255,255,255,0.55)';
+      // ハイライト（カット面）
+      ctx.fillStyle = 'rgba(255,255,255,0.6)';
       ctx.beginPath();
-      ctx.arc(cx - r * 0.3, cy - r * 0.35, r * 0.3, 0, Math.PI * 2);
+      ctx.moveTo(cx, cy - r);
+      ctx.lineTo(cx + r * 0.7, cy - r * 0.25);
+      ctx.lineTo(cx, cy);
+      ctx.closePath();
       ctx.fill();
     }
   }
@@ -274,7 +356,7 @@ export class Renderer {
     ctx.arc(cx + eyeOffX, cy + eyeOffY, eyeR, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.fillStyle = '#0000FF';
+    ctx.fillStyle = COLORS.GHOST_EATEN_PUPIL;
     ctx.beginPath();
     ctx.arc(cx - eyeOffX, cy + eyeOffY, eyeR * 0.5, 0, Math.PI * 2);
     ctx.arc(cx + eyeOffX, cy + eyeOffY, eyeR * 0.5, 0, Math.PI * 2);
@@ -286,18 +368,22 @@ export class Renderer {
     const cx = CANVAS_WIDTH / 2;
     const cy = CANVAS_HEIGHT / 2;
 
-    ctx.fillStyle = 'rgba(0,0,0,0.75)';
-    ctx.fillRect(0, cy - 80, CANVAS_WIDTH, 160);
+    ctx.fillStyle = 'rgba(5,6,15,0.8)';
+    ctx.fillRect(0, cy - 90, CANVAS_WIDTH, 180);
 
-    ctx.fillStyle = '#FFE000';
+    ctx.fillStyle = '#7DF0FF';
     ctx.font = `bold ${TILE_SIZE * 2}px monospace`;
     ctx.textAlign = 'center';
-    ctx.fillText('迷宮ラン', cx, cy - 30);
+    ctx.fillText('STELLAR RUN', cx, cy - 40);
+
+    ctx.fillStyle = '#9FD0FF';
+    ctx.font = `${TILE_SIZE}px monospace`;
+    ctx.fillText('ステラー・ラン', cx, cy - 12);
 
     ctx.fillStyle = '#FFFFFF';
     ctx.font = `${TILE_SIZE}px monospace`;
-    ctx.fillText('Press SPACE or Tap to Start', cx, cy + 10);
-    ctx.fillText('Arrow Keys / WASD / Swipe', cx, cy + 35);
+    ctx.fillText('Press SPACE or Tap to Start', cx, cy + 20);
+    ctx.fillText('Arrow Keys / WASD / Swipe', cx, cy + 45);
   }
 
   private drawReady(): void {
@@ -305,7 +391,7 @@ export class Renderer {
     const cx = CANVAS_WIDTH / 2;
     const cy = CANVAS_HEIGHT / 2;
 
-    ctx.fillStyle = '#FFE000';
+    ctx.fillStyle = '#7DF0FF';
     ctx.font = `bold ${TILE_SIZE * 2}px monospace`;
     ctx.textAlign = 'center';
     ctx.fillText('READY!', cx, cy);
@@ -336,7 +422,7 @@ export class Renderer {
     ctx.fillStyle = 'rgba(0,0,0,0.75)';
     ctx.fillRect(0, cy - 80, CANVAS_WIDTH, 160);
 
-    ctx.fillStyle = '#FFE000';
+    ctx.fillStyle = '#7DF0FF';
     ctx.font = `bold ${TILE_SIZE * 2}px monospace`;
     ctx.textAlign = 'center';
     ctx.fillText('ALL CLEAR!', cx, cy - 20);

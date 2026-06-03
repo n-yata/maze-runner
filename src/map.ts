@@ -175,14 +175,31 @@ export class MapManager {
         const cx = col * TILE_SIZE + TILE_SIZE / 2;
         const cy = row * TILE_SIZE + TILE_SIZE / 2 + offsetY;
 
-        ctx.fillStyle = COLORS.DOT;
         if (tile === 3) {
+          // パワーエサ = 発光するコア
+          const r = TILE_SIZE / 3;
+          ctx.fillStyle = COLORS.POWER_DOT_GLOW; // グロー
           ctx.beginPath();
-          ctx.arc(cx, cy, TILE_SIZE / 3, 0, Math.PI * 2);
+          ctx.arc(cx, cy, r * 1.6, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = COLORS.POWER_DOT;
+          ctx.beginPath();
+          ctx.arc(cx, cy, r, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = '#FFFFFF';
+          ctx.beginPath();
+          ctx.arc(cx - r * 0.3, cy - r * 0.3, r * 0.35, 0, Math.PI * 2);
           ctx.fill();
         } else {
+          // 通常ドット = エネルギー結晶（菱形）
+          const s = 3;
+          ctx.fillStyle = COLORS.DOT;
           ctx.beginPath();
-          ctx.arc(cx, cy, 2, 0, Math.PI * 2);
+          ctx.moveTo(cx, cy - s);
+          ctx.lineTo(cx + s, cy);
+          ctx.lineTo(cx, cy + s);
+          ctx.lineTo(cx - s, cy);
+          ctx.closePath();
           ctx.fill();
         }
       }

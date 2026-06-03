@@ -45,31 +45,36 @@ export const GHOST_RELEASE_DOT_THRESHOLDS: Record<GhostName, number> = {
   CLYDE:  60,
 };
 
+// エイリアン4体。内部キー(BLINKY/PINKY/INKY/CLYDE)は不変、配色のみ宇宙テーマへ
 export const GHOST_COLORS: Record<GhostName, string> = {
-  BLINKY: '#FF0000',
-  PINKY:  '#FFB8FF',
-  INKY:   '#00FFFF',
-  CLYDE:  '#FFB852',
+  BLINKY: '#FF4D5E', // 赤エイリアン
+  PINKY:  '#FF8AD8', // ピンクエイリアン
+  INKY:   '#4DE0FF', // シアンエイリアン
+  CLYDE:  '#FFC24D', // アンバーエイリアン
 };
 
 export const COLORS = {
-  BACKGROUND: '#000000',
-  WALL:        '#0000FF',
-  WALL_INNER:  '#000088',
-  DOT:         '#FFB8AE',
-  POWER_DOT:   '#FFB8AE',
-  PLAYER:      '#FFE000',
-  GHOST_FRIGHTENED:     '#0000FF',
+  BACKGROUND: '#05060F',          // 深宇宙
+  WALL:        '#2747C8',         // コロニー通路（基準色）
+  WALL_INNER:  '#0A1230',
+  DOT:         '#7DF0FF',         // エネルギー結晶
+  POWER_DOT:   '#FFE66D',         // コア
+  POWER_DOT_GLOW: 'rgba(255, 230, 109, 0.30)', // コアのグロー（POWER_DOTと同系）
+  PLAYER:      '#9FD0FF',         // 宇宙船ハル
+  GHOST_FRIGHTENED:     '#2A2AE0',
   GHOST_FRIGHTENED_END: '#FFFFFF',
   GHOST_EATEN_EYES:     '#FFFFFF',
+  GHOST_EATEN_PUPIL:    '#2A2AE0',
   SCORE_TEXT:  '#FFFFFF',
-  LIFE_COLOR:  '#FFE000',
+  LIFE_COLOR:  '#9FD0FF',
+  SHIP_THRUSTER: '#FF8A3C',       // 推進炎
+  SHIP_COCKPIT:  '#06324A',       // コックピット
 } as const;
 
 export const STAGE_WALL_COLORS = [
-  { wall: '#0000FF', inner: '#000088' }, // Stage 1: Blue
-  { wall: '#007700', inner: '#004400' }, // Stage 2: Green
-  { wall: '#AA0000', inner: '#660000' }, // Stage 3: Red
+  { wall: '#2747C8', inner: '#0A1230' }, // Stage 1: 青コロニー
+  { wall: '#7A2BD0', inner: '#1E0A38' }, // Stage 2: 紫星雲
+  { wall: '#1FA89A', inner: '#06322D' }, // Stage 3: エイリアンの巣
 ] as const;
 
 export function getStageColors(level: number): { wall: string; inner: string } {
@@ -99,12 +104,13 @@ export interface FruitDef {
   score: number;
 }
 
+// 宇宙アイテム（鉱石/コア）。スコアは不変、color のみ宇宙テーマへ
 const FRUIT_TABLE: FruitDef[] = [
-  { color: '#FF2222', score: 100  }, // Level 1: Cherry
-  { color: '#FF44AA', score: 300  }, // Level 2: Strawberry
-  { color: '#FF8800', score: 500  }, // Level 3: Orange
-  { color: '#CC1100', score: 700  }, // Level 4: Apple
-  { color: '#22BB44', score: 1000 }, // Level 5+: Melon
+  { color: '#7DF9FF', score: 100  }, // Level 1: クリスタル鉱石
+  { color: '#FF6EC7', score: 300  }, // Level 2: プラズマ核
+  { color: '#FFB347', score: 500  }, // Level 3: アンバー鉱石
+  { color: '#A56BFF', score: 700  }, // Level 4: 反物質コア
+  { color: '#5FFF8F', score: 1000 }, // Level 5+: バイオコア
 ];
 
 export const FRUIT_SPAWN_THRESHOLDS = [47, 113] as const;
