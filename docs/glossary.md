@@ -27,13 +27,13 @@
 
 **定義**: フィールドに配置された小さな点。プレイヤーが通過すると収集され 10 点加算される。
 
-**説明**: 全ドットを収集するとステージクリアとなる。原作では「エサ」とも呼ばれる。
+**説明**: 収集するとスコアが加算される。ステージクリア条件ではない（クリアは敵全滅で成立）。原作では「エサ」とも呼ばれる。
 
 **関連用語**: [パワーエサ](#パワーエサ)、[ステージクリア](#ステージクリア)
 
 **使用例**:
-- 「残ドット数が 0 になるとステージクリア」
-- `state.dotsRemaining` フィールドで残数を管理
+- 「ドットはスコア要素であり、残数はクリア条件に影響しない」
+- ドット取得数（dotsEaten）は敵の解放タイミング判定に利用される
 
 **英語表記**: Dot
 
@@ -328,7 +328,7 @@ this.ctx.drawImage(this.mapCache, 0, 0);
 | `PLAYING` | プレイ中 | READY から 3 秒後 / PAUSED から再開 |
 | `PAUSED` | 一時停止 | PLAYING 中に ESC / 停止ボタン |
 | `PLAYER_DEAD` | 死亡アニメーション中 | ゴーストと衝突 |
-| `STAGE_CLEAR` | ステージクリアアニメーション | 全ドット収集 |
+| `STAGE_CLEAR` | ステージクリアアニメーション | 敵全滅 |
 | `GAME_OVER` | ゲームオーバー画面 | 残機0での PLAYER_DEAD |
 
 **状態遷移図**:
@@ -343,7 +343,7 @@ stateDiagram-v2
     PLAYING --> PLAYER_DEAD: ゴースト衝突
     PLAYER_DEAD --> READY: 残機あり
     PLAYER_DEAD --> GAME_OVER: 残機0
-    PLAYING --> STAGE_CLEAR: 全ドット収集
+    PLAYING --> STAGE_CLEAR: 敵全滅
     STAGE_CLEAR --> READY: 2秒後（次レベル）
     GAME_OVER --> TITLE: タップ/スペース
 ```

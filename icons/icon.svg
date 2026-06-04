@@ -3,77 +3,43 @@
   <rect width="512" height="512" fill="#05060F"/>
 
   <!-- 星々 -->
-  <g fill="#FFFFFF">
+  <g fill="#C8D2EB">
     <circle cx="70" cy="300" r="2" opacity="0.7"/>
     <circle cx="120" cy="430" r="1.5" opacity="0.5"/>
-    <circle cx="250" cy="260" r="1.5" opacity="0.6"/>
+    <circle cx="250" cy="80" r="1.5" opacity="0.6"/>
     <circle cx="300" cy="430" r="2" opacity="0.7"/>
     <circle cx="430" cy="320" r="1.5" opacity="0.5"/>
     <circle cx="450" cy="440" r="2" opacity="0.6"/>
-    <circle cx="190" cy="350" r="1.5" opacity="0.5"/>
-    <circle cx="380" cy="380" r="1.5" opacity="0.6"/>
-    <circle cx="60" cy="120" r="1.5" opacity="0.5"/>
-    <circle cx="470" cy="130" r="2" opacity="0.6"/>
+    <circle cx="110" cy="110" r="1.5" opacity="0.5"/>
+    <circle cx="380" cy="110" r="1.5" opacity="0.6"/>
+    <circle cx="60" cy="380" r="1.5" opacity="0.5"/>
+    <circle cx="470" cy="200" r="2" opacity="0.6"/>
   </g>
 
-  <!-- コロニー外壁（枠） -->
-  <rect x="0" y="0" width="512" height="28" fill="#2747C8"/>
-  <rect x="0" y="484" width="512" height="28" fill="#2747C8"/>
-  <rect x="0" y="0" width="28" height="512" fill="#2747C8"/>
-  <rect x="484" y="0" width="28" height="512" fill="#2747C8"/>
-
-  <!-- コロニー通路（内壁アクセント） -->
-  <rect x="56" y="60" width="120" height="22" rx="6" fill="#2747C8"/>
-  <rect x="336" y="60" width="120" height="22" rx="6" fill="#2747C8"/>
-  <rect x="56" y="60" width="22" height="70" rx="6" fill="#2747C8"/>
-  <rect x="434" y="60" width="22" height="70" rx="6" fill="#2747C8"/>
-
-  <!-- コア（パワーアイテム）グロー + 本体 -->
-  <circle cx="110" cy="120" r="26" fill="#FFE66D" opacity="0.30"/>
-  <circle cx="110" cy="120" r="15" fill="#FFE66D"/>
-  <circle cx="402" cy="120" r="26" fill="#FFE66D" opacity="0.30"/>
-  <circle cx="402" cy="120" r="15" fill="#FFE66D"/>
-
-  <!-- エネルギー結晶（ドット） -->
-  <g fill="#7DF0FF">
-    <circle cx="180" cy="120" r="9"/>
-    <circle cx="256" cy="120" r="9"/>
-    <circle cx="332" cy="120" r="9"/>
-    <circle cx="256" cy="200" r="9"/>
-  </g>
-
-  <!-- 赤エイリアン -->
+  <!-- 宇宙飛行士（ヘルメット中心 256,186 / r=92） -->
   <g>
-    <!-- 触角 -->
-    <line x1="137" y1="158" x2="128" y2="123" stroke="#FF4D5E" stroke-width="5" stroke-linecap="round"/>
-    <line x1="163" y1="158" x2="172" y2="123" stroke="#FF4D5E" stroke-width="5" stroke-linecap="round"/>
-    <circle cx="128" cy="118" r="10" fill="#FF4D5E"/>
-    <circle cx="172" cy="118" r="10" fill="#FF4D5E"/>
-    <!-- 体（ドーム＋波打つ底） -->
-    <path d="M96 185 A54 54 0 0 1 204 185 L204 239 L177 215 L150 239 L123 215 L96 239 Z" fill="#FF4D5E"/>
-    <!-- 大きな目 -->
-    <circle cx="150" cy="182" r="27" fill="#FFFFFF"/>
-    <circle cx="150" cy="182" r="13" fill="#0A0A1A"/>
-  </g>
-
-  <!-- シアンエイリアン -->
-  <g>
-    <line x1="367" y1="182" x2="360" y2="152" stroke="#4DE0FF" stroke-width="4" stroke-linecap="round"/>
-    <line x1="389" y1="182" x2="396" y2="152" stroke="#4DE0FF" stroke-width="4" stroke-linecap="round"/>
-    <circle cx="360" cy="148" r="8" fill="#4DE0FF"/>
-    <circle cx="396" cy="148" r="8" fill="#4DE0FF"/>
-    <path d="M332 205 A46 46 0 0 1 424 205 L424 251 L401 230 L378 251 L355 230 L332 251 Z" fill="#4DE0FF"/>
-    <circle cx="378" cy="203" r="23" fill="#FFFFFF"/>
-    <circle cx="378" cy="203" r="11" fill="#0A0A1A"/>
-  </g>
-
-  <!-- 自機（宇宙船・右向き） -->
-  <g>
-    <!-- 推進炎 -->
-    <path d="M163 300 L85 330 L163 360 Z" fill="#FF8A3C"/>
-    <!-- 船体 -->
-    <path d="M326 330 L167 261 L197 330 L167 399 Z" fill="#9FD0FF"/>
-    <!-- コックピット -->
-    <circle cx="253" cy="330" r="24" fill="#06324A"/>
+    <!-- バックパック（推進ユニット） -->
+    <rect x="164" y="241" width="184" height="175" rx="16" fill="#5E76A8"/>
+    <!-- 推進ノズルの発光 -->
+    <circle cx="256" cy="430" r="29" fill="#FF8A3C"/>
+    <!-- 脚 -->
+    <rect x="199" y="385" width="51" height="106" rx="14" fill="#9FD0FF"/>
+    <rect x="262" y="385" width="51" height="106" rx="14" fill="#9FD0FF"/>
+    <!-- ブーツ -->
+    <rect x="195" y="477" width="58" height="37" rx="8" fill="#2BE0A8"/>
+    <rect x="259" y="477" width="58" height="37" rx="8" fill="#2BE0A8"/>
+    <!-- 腕 -->
+    <rect x="138" y="257" width="46" height="138" rx="18" fill="#E8F2FF"/>
+    <rect x="328" y="257" width="46" height="138" rx="18" fill="#E8F2FF"/>
+    <!-- 胴体 -->
+    <rect x="178" y="252" width="156" height="147" rx="28" fill="#E8F2FF"/>
+    <!-- 胸部コントロールパネル -->
+    <rect x="224" y="303" width="64" height="41" rx="8" fill="#2BE0A8"/>
+    <!-- ヘルメット -->
+    <circle cx="256" cy="186" r="92" fill="#E8F2FF"/>
+    <!-- バイザー -->
+    <circle cx="256" cy="191" r="61" fill="#06324A"/>
+    <!-- バイザー反射 -->
+    <circle cx="232" cy="166" r="18" fill="#7DF0FF"/>
   </g>
 </svg>

@@ -1,6 +1,7 @@
 import type { GameState } from './types.js';
 import { INITIAL_LIVES, MAX_LEVEL, getLevelParams, COLORS, getFruitDef } from './constants.js';
 import { ParticleSystem } from './particles.js';
+import { LaserManager } from './laser.js';
 import type { MapManager } from './map.js';
 import type { PlayerManager } from './player.js';
 import type { GhostManager } from './ghost.js';
@@ -26,6 +27,7 @@ export class GameLoop {
   private rafId = 0;
   private lastPowerDotCount = -1;
   private particles = new ParticleSystem();
+  private laser = new LaserManager();
   private readonly boundLoop: FrameRequestCallback;
 
   constructor(
@@ -97,6 +99,7 @@ export class GameLoop {
     this.player.resetScore();
     this.ghostMgr.reset(params);
     this.fruitMgr.reset();
+    this.laser.reset();
     this.lastPowerDotCount = -1;
     this.audio.play('GAME_START');
   }
@@ -117,6 +120,7 @@ export class GameLoop {
     this.player.reset(params.playerSpeed);
     this.ghostMgr.reset(params);
     this.fruitMgr.reset();
+    this.laser.reset();
     this.lastPowerDotCount = -1;
   }
 
@@ -126,6 +130,8 @@ export class GameLoop {
     const params = getLevelParams(this.state.level);
     this.player.reset(params.playerSpeed);
     this.ghostMgr.reset(params);
+    this.fruitMgr.reset();
+    this.laser.reset();
     this.lastPowerDotCount = -1;
   }
 
@@ -148,7 +154,7 @@ export class GameLoop {
       this.accumulator -= FIXED_TIMESTEP;
     }
 
-    this.renderer.render(this.state, this.map, this.player, this.ghostMgr, this.fruitMgr, this.particles);
+    this.renderer.render(this.state, this.map, this.player, this.ghostMgr, this.fruitMgr, this.particles, this.laser);
     this.rafId = requestAnimationFrame(this.boundLoop);
   }
 
@@ -245,13 +251,25 @@ export class GameLoop {
       this.particles.spawnBurst(ppos.x, ppos.y, '#FFFFFF', 18, 110); // 撃破スパーク
     }
 
+    // フルーツ＝レーザー発動アイテム。敵が残る限り繰り返し出現させる（詰み防止）。
     // getValidFruitPositions() はマップ固定のキャッシュ参照（O(1)）
-    this.fruitMgr.checkSpawn(this.state.dotsEaten, this.state.level, this.map.getValidFruitPositions());
-    const fruitScore = this.fruitMgr.update(dt, this.player.getPixelPos());
-    if (fruitScore > 0) {
-      this.state.score += fruitScore;
+    const enemiesRemain = !this.ghostMgr.allDefeated();
+    this.fruitMgr.updateSpawning(dt, enemiesRemain, this.state.level, this.map.getValidFruitPositions());
+    const fruitsEaten = this.fruitMgr.update(dt, this.player.getPixelPos());
+    if (fruitsEaten > 0) {
+      this.laser.activate();
       this.audio.play('EAT_FRUIT');
       this.particles.spawnBurst(ppos.x, ppos.y, getFruitDef(this.state.level).color, 16, 100);
+    }
+
+    // レーザー（進行方向へ自動連射）。敵ヒットで撃破＝スコア加算。
+    const laserScore = this.laser.update(
+      dt, this.player.getPixelPos(), this.player.state.dir, this.map, this.ghostMgr,
+    );
+    if (laserScore > 0) {
+      this.state.score += laserScore;
+      this.particles.spawnBurst(ppos.x, ppos.y, '#FF4D5E', 18, 110); // レーザー撃破スパーク
+      this.audio.play('EAT_GHOST');
     }
 
     if (this.state.score > this.state.highScore) {
@@ -264,7 +282,8 @@ export class GameLoop {
       return;
     }
 
-    if (this.map.getRemainingDots() === 0) {
+    // クリア条件: 敵を全滅させる（通常エサの取得状況は問わない）
+    if (this.ghostMgr.allDefeated()) {
       this.storage.setHighScore(this.state.score);
       this.state.highScore = this.storage.getHighScore();
       this.state.phase = 'STAGE_CLEAR';

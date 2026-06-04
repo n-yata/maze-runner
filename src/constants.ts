@@ -86,7 +86,7 @@ export const SCORE = {
   DOT:         10,
   POWER_DOT:   50,
   GHOST_BASE:  200,
-  FRUIT:       100,
+  // フルーツはレーザー発動アイテムに転換したためスコアは付与しない（SCORE.FRUIT は廃止）
 } as const;
 
 // Ghost consecutive eat scores: 200, 400, 800, 1600
@@ -113,9 +113,16 @@ const FRUIT_TABLE: FruitDef[] = [
   { color: '#5FFF8F', score: 1000 }, // Level 5+: バイオコア
 ];
 
-export const FRUIT_SPAWN_THRESHOLDS = [47, 113] as const;
-export const FRUIT_DURATION = 15.0;
-export const FRUIT_MAX_ACTIVE = 2;
+// フルーツ（レーザー発動アイテム）は敵が残る限り繰り返し出現する（詰み防止）
+export const FRUIT_DURATION = 15.0;       // 盤面に滞在する時間（取得されなければ消滅）
+export const FRUIT_FIRST_DELAY = 4.0;     // ステージ開始から初回出現までの遅延
+export const FRUIT_RESPAWN_INTERVAL = 6.0; // 盤面からフルーツが消えてから次に出るまでの間隔
+
+// レーザー（フルーツ取得で一定時間、進行方向へ自動連射）
+export const LASER_DURATION = 6.0;        // レーザーモードの継続時間(秒)
+export const LASER_FIRE_INTERVAL = 0.18;  // 連射間隔(秒)
+export const LASER_SPEED = 16;            // ビーム速度(tiles/秒)
+export const LASER_HIT_RADIUS = TILE_SIZE * 0.6; // 敵への命中判定半径(px)
 
 export function getFruitDef(level: number): FruitDef {
   const idx = Math.max(0, Math.min(level - 1, FRUIT_TABLE.length - 1));

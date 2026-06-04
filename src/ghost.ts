@@ -351,4 +351,31 @@ export class GhostManager {
   getFrightenedEndWarning(): boolean {
     return this.ghosts.some(g => g.mode === 'FRIGHTENED' && g.frightenedTimer < 2);
   }
+
+  /**
+   * (px,py) を中心とする半径 radius 内にいる敵を1体撃破（VANISHED）する。
+   * モードを問わず撃破でき（レーザーは武器）、連続加点(GHOST_EAT_SCORES)に基づくスコアを返す。
+   * 1回の呼び出しで撃破するのは最大1体（1ビーム＝1体）。撃破がなければ 0。
+   */
+  defeatAt(px: number, py: number, radius: number): number {
+    const r2 = radius * radius;
+    for (const g of this.ghosts) {
+      if (g.mode === 'VANISHED') continue;
+      const dx = g.pixelPos.x - px;
+      const dy = g.pixelPos.y - py;
+      if (dx * dx + dy * dy < r2) {
+        const eatIdx = Math.min(g.eatenScore, GHOST_EAT_SCORES.length - 1);
+        const score = GHOST_EAT_SCORES[eatIdx] ?? 200;
+        g.eatenScore++;
+        g.mode = 'VANISHED';
+        return score;
+      }
+    }
+    return 0;
+  }
+
+  /** 敵が全員撃破済み（VANISHED）か。ステージクリア判定に使う。 */
+  allDefeated(): boolean {
+    return this.ghosts.every(g => g.mode === 'VANISHED');
+  }
 }

@@ -177,19 +177,30 @@ describe('GameLoop – phase transitions', () => {
     expect(state(loop).phaseTimer).toBe(0);
   });
 
-  it('transitions PLAYING → STAGE_CLEAR when all dots eaten', () => {
+  it('transitions PLAYING → STAGE_CLEAR when all enemies are defeated', () => {
+    const { loop, ghosts } = makeGameLoop();
+    state(loop).phase = 'PLAYING';
+
+    // Defeat every enemy
+    for (const g of ghosts.ghosts) g.mode = 'VANISHED';
+
+    tickFor(loop, 1 / 60); // one frame triggers the check
+    expect(state(loop).phase).toBe('STAGE_CLEAR');
+  });
+
+  it('does NOT clear the stage merely by eating all dots (enemies still alive)', () => {
     const { loop, map } = makeGameLoop();
     state(loop).phase = 'PLAYING';
 
-    // Eat all dots
+    // Eat all dots — clear condition is enemy defeat, not dot collection
     for (let col = 0; col < COLS; col++) {
       for (let row = 0; row < ROWS; row++) {
         map.eatDot(col, row);
       }
     }
 
-    tickFor(loop, 1 / 60); // one frame triggers the check
-    expect(state(loop).phase).toBe('STAGE_CLEAR');
+    tickFor(loop, 1 / 60);
+    expect(state(loop).phase).toBe('PLAYING');
   });
 
   it('STAGE_CLEAR → READY increments level (within MAX_LEVEL)', () => {

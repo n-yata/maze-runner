@@ -294,6 +294,74 @@ describe('GhostManager', () => {
     });
   });
 
+  describe('defeatAt() (laser kill)', () => {
+    it('defeats a ghost within radius and returns consecutive score', () => {
+      const blinky = mgr.ghosts.find(g => g.name === 'BLINKY')!;
+      const { x, y } = blinky.pixelPos;
+
+      const score = mgr.defeatAt(x + 2, y, TILE_SIZE * 0.6);
+
+      expect(blinky.mode).toBe('VANISHED');
+      expect(score).toBe(200);
+      expect(blinky.eatenScore).toBe(1);
+    });
+
+    it('defeats ghosts regardless of mode (weapon, not power-dot)', () => {
+      const pinky = mgr.ghosts.find(g => g.name === 'PINKY')!;
+      pinky.mode = 'CHASE';
+      const { x, y } = pinky.pixelPos;
+
+      const score = mgr.defeatAt(x, y, TILE_SIZE * 0.6);
+
+      expect(pinky.mode).toBe('VANISHED');
+      expect(score).toBeGreaterThan(0);
+    });
+
+    it('returns 0 and defeats nothing when no ghost is within radius', () => {
+      const score = mgr.defeatAt(-500, -500, TILE_SIZE * 0.6);
+      expect(score).toBe(0);
+      expect(mgr.ghosts.every(g => g.mode !== 'VANISHED')).toBe(true);
+    });
+
+    it('does not re-defeat an already VANISHED ghost', () => {
+      const blinky = mgr.ghosts.find(g => g.name === 'BLINKY')!;
+      blinky.mode = 'VANISHED';
+      const { x, y } = blinky.pixelPos;
+
+      const score = mgr.defeatAt(x, y, TILE_SIZE * 0.6);
+      expect(score).toBe(0);
+    });
+
+    it('defeats at most one ghost per call', () => {
+      // Stack two ghosts at the same pixel position
+      const blinky = mgr.ghosts.find(g => g.name === 'BLINKY')!;
+      const pinky = mgr.ghosts.find(g => g.name === 'PINKY')!;
+      pinky.pixelPos = { ...blinky.pixelPos };
+
+      mgr.defeatAt(blinky.pixelPos.x, blinky.pixelPos.y, TILE_SIZE * 0.6);
+
+      const vanished = mgr.ghosts.filter(g => g.mode === 'VANISHED');
+      expect(vanished).toHaveLength(1);
+    });
+  });
+
+  describe('allDefeated()', () => {
+    it('returns false when at least one ghost remains', () => {
+      expect(mgr.allDefeated()).toBe(false);
+    });
+
+    it('returns true only when every ghost is VANISHED', () => {
+      for (const g of mgr.ghosts) g.mode = 'VANISHED';
+      expect(mgr.allDefeated()).toBe(true);
+    });
+
+    it('returns false when one ghost is still alive', () => {
+      for (const g of mgr.ghosts) g.mode = 'VANISHED';
+      mgr.ghosts[0]!.mode = 'CHASE';
+      expect(mgr.allDefeated()).toBe(false);
+    });
+  });
+
   describe('chooseDirection() dead-end handling', () => {
     it('ghost does not enter wall tile even in dead-end (reversal allowed)', () => {
       const { map, player, audio } = makeDeps();

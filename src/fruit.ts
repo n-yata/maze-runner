@@ -1,10 +1,9 @@
 import type { Vec2 } from './types.js';
 import {
   TILE_SIZE,
-  FRUIT_SPAWN_THRESHOLDS,
   FRUIT_DURATION,
-  FRUIT_MAX_ACTIVE,
-  getFruitDef,
+  FRUIT_FIRST_DELAY,
+  FRUIT_RESPAWN_INTERVAL,
 } from './constants.js';
 
 export interface FruitState {
@@ -14,9 +13,14 @@ export interface FruitState {
   level: number;
 }
 
+/**
+ * フルーツ（レーザー発動アイテム）の管理。
+ * 敵が残っている限り、盤面に常に最大1個のフルーツを一定間隔で出現させる（詰み防止）。
+ * 取得するとレーザーモードが発動する（スコアは付与しない）。
+ */
 export class FruitManager {
   private states: FruitState[] = [];
-  private readonly spawnedThresholds = new Set<number>();
+  private spawnCooldown = FRUIT_FIRST_DELAY;
 
   private pickRandomPos(validPositions: Vec2[]): Vec2 | null {
     const occupied = new Set(this.states.map(s => `${s.col},${s.row}`));
@@ -25,26 +29,33 @@ export class FruitManager {
     return candidates[Math.floor(Math.random() * candidates.length)]!;
   }
 
-  checkSpawn(dotsEaten: number, level: number, validPositions: Vec2[]): void {
-    for (const thresh of FRUIT_SPAWN_THRESHOLDS) {
-      if (dotsEaten >= thresh && !this.spawnedThresholds.has(thresh)) {
-        if (this.states.length >= FRUIT_MAX_ACTIVE) {
-          // At capacity: consume threshold so it won't retry endlessly
-          this.spawnedThresholds.add(thresh);
-        } else {
-          const pos = this.pickRandomPos(validPositions);
-          if (pos) {
-            this.spawnedThresholds.add(thresh);
-            this.states.push({ col: pos.x, row: pos.y, timer: FRUIT_DURATION, level });
-          }
-          // If pos is null (no valid positions), leave threshold unconsumed to retry next frame
-        }
+  /**
+   * 敵が残る限り、盤面にフルーツが無ければクールダウン経過ごとに1個出現させる。
+   * これにより取り逃しや撃ち漏らしがあっても必ず再びレーザーを得られる（詰まない）。
+   */
+  updateSpawning(dt: number, enemiesRemain: boolean, level: number, validPositions: Vec2[]): void {
+    if (!enemiesRemain) return;
+    // 盤面にフルーツがある間はクールダウンを進めない（早期 return）。
+    // よって再出現は「盤面から消えてから FRUIT_RESPAWN_INTERVAL 秒後」になる。
+    if (this.states.length > 0) return;
+
+    this.spawnCooldown -= dt;
+    if (this.spawnCooldown <= 0) {
+      const pos = this.pickRandomPos(validPositions);
+      if (pos) {
+        this.states.push({ col: pos.x, row: pos.y, timer: FRUIT_DURATION, level });
+        this.spawnCooldown = FRUIT_RESPAWN_INTERVAL;
       }
+      // pos が null（候補なし）の場合は次フレームに再試行
     }
   }
 
+  /**
+   * フルーツの寿命を進め、プレイヤーが重なったフルーツを取得する。
+   * 今フレームで取得したフルーツ数を返す（>0 ならレーザー発動）。
+   */
   update(dt: number, playerPixelPos: Vec2): number {
-    let totalScore = 0;
+    let eaten = 0;
     this.states = this.states.filter(state => {
       state.timer -= dt;
       if (state.timer <= 0) return false;
@@ -54,12 +65,12 @@ export class FruitManager {
       const dx = playerPixelPos.x - fruitX;
       const dy = playerPixelPos.y - fruitY;
       if (Math.sqrt(dx * dx + dy * dy) < TILE_SIZE) {
-        totalScore += getFruitDef(state.level).score;
+        eaten++;
         return false;
       }
       return true;
     });
-    return totalScore;
+    return eaten;
   }
 
   getStates(): FruitState[] {
@@ -68,6 +79,6 @@ export class FruitManager {
 
   reset(): void {
     this.states = [];
-    this.spawnedThresholds.clear();
+    this.spawnCooldown = FRUIT_FIRST_DELAY;
   }
 }

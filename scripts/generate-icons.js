@@ -38,21 +38,17 @@ function encodePNG(w, h, px) {
   return Buffer.concat([sig, pngChunk('IHDR', ihdr), pngChunk('IDAT', deflateSync(raw, { level: 6 })), pngChunk('IEND', Buffer.alloc(0))]);
 }
 
-// 宇宙テーマの配色（src/constants.ts と対応）
+// 宇宙テーマの配色（src/constants.ts・宇宙飛行士の自機と対応）
 const C = {
-  BG:        [5, 6, 15],       // #05060F 深宇宙
-  WALL:      [39, 71, 200],    // #2747C8 コロニー壁
-  CORE:      [255, 230, 109],  // #FFE66D コア（パワー）
-  CORE_GLOW: [80, 73, 43],     // CORE を背景に 30% で重ねた近似グロー
-  CRYSTAL:   [125, 240, 255],  // #7DF0FF エネルギー結晶
-  SHIP:      [159, 208, 255],  // #9FD0FF 宇宙船ハル
-  COCKPIT:   [6, 50, 74],      // #06324A コックピット
-  THRUSTER:  [255, 138, 60],   // #FF8A3C 推進炎
-  ALIEN_RED: [255, 77, 94],    // #FF4D5E 赤エイリアン
-  ALIEN_CYAN:[77, 224, 255],   // #4DE0FF シアンエイリアン
-  EYE:       [255, 255, 255],  // 目（白）
-  PUPIL:     [10, 10, 26],     // #0A0A1A 瞳
-  STAR:      [200, 210, 235],  // 星（控えめな白）
+  BG:         [5, 6, 15],      // #05060F 深宇宙
+  STAR:       [200, 210, 235], // 星（控えめな白）
+  SUIT:       [232, 242, 255], // #E8F2FF スーツ（明）
+  SUIT_SHADE: [159, 208, 255], // #9FD0FF スーツ（陰）
+  VISOR:      [6, 50, 74],     // #06324A バイザー（暗いガラス）
+  VISOR_GLOW: [125, 240, 255], // #7DF0FF バイザー反射
+  BACKPACK:   [94, 118, 168],  // #5E76A8 推進ユニット
+  ACCENT:     [43, 224, 168],  // #2BE0A8 胸部パネル/ブーツ
+  THRUSTER:   [255, 138, 60],  // #FF8A3C 推進炎
 };
 
 function sp(px, w, h, x, y, rgb) {
@@ -122,25 +118,39 @@ function fillLine(px, w, h, x1, y1, x2, y2, width, rgb) {
   ], rgb);
 }
 
-// エイリアン（ドーム頭＋波打つ底＋大きな目＋触角）。SVG と同一構図
-function drawAlien(px, w, h, cx, cy, r, color) {
-  // 触角（2本＋先端の発光球）
-  for (const s of [-0.4 * r, 0.4 * r]) {
-    fillLine(px, w, h, cx + s * 0.6, cy - 0.5 * r, cx + s, cy - 1.15 * r, Math.max(2, r * 0.09), color);
-    fillCircle(px, w, h, cx + s, cy - 1.25 * r, Math.max(2, r * 0.18), color);
-  }
-  // 頭（ドーム）
-  fillDome(px, w, h, cx, cy, r, color);
-  // 体＋波打つ底（多角形）
-  fillPoly(px, w, h, [
-    [cx - r, cy], [cx + r, cy],
-    [cx + r, cy + r], [cx + 0.5 * r, cy + 0.55 * r],
-    [cx, cy + r], [cx - 0.5 * r, cy + 0.55 * r],
-    [cx - r, cy + r],
-  ], color);
-  // 大きな目＋瞳
-  fillCircle(px, w, h, cx, cy - 0.05 * r, 0.5 * r, C.EYE);
-  fillCircle(px, w, h, cx, cy - 0.05 * r, 0.24 * r, C.PUPIL);
+// 宇宙飛行士（ヘルメット＋バイザー＋スーツ＋バックパック）。中心(cx,cy)はヘルメット中心、r=ヘルメット半径
+function drawAstronaut(px, w, h, cx, cy, r) {
+  const bodyTop = cy + r * 0.7;   // 胴体上端
+  // バックパック（推進ユニット・胴体背後）
+  fillRect(px, w, h, cx - r * 1.0, bodyTop - r * 0.1, r * 2.0, r * 1.9, C.BACKPACK);
+  // バックパックの発光ノズル
+  fillCircle(px, w, h, cx, bodyTop + r * 1.95, r * 0.32, C.THRUSTER);
+
+  // 脚（2本）
+  fillRect(px, w, h, cx - r * 0.62, bodyTop + r * 1.45, r * 0.55, r * 1.15, C.SUIT_SHADE);
+  fillRect(px, w, h, cx + r * 0.07, bodyTop + r * 1.45, r * 0.55, r * 1.15, C.SUIT_SHADE);
+  // ブーツ
+  fillRect(px, w, h, cx - r * 0.66, bodyTop + r * 2.45, r * 0.63, r * 0.4, C.ACCENT);
+  fillRect(px, w, h, cx + r * 0.03, bodyTop + r * 2.45, r * 0.63, r * 0.4, C.ACCENT);
+
+  // 腕（2本・肩から下へ）
+  fillRect(px, w, h, cx - r * 1.28, bodyTop + r * 0.05, r * 0.5, r * 1.5, C.SUIT);
+  fillRect(px, w, h, cx + r * 0.78, bodyTop + r * 0.05, r * 0.5, r * 1.5, C.SUIT);
+
+  // 胴体（スーツ）
+  fillRect(px, w, h, cx - r * 0.85, bodyTop, r * 1.7, r * 1.6, C.SUIT);
+  // 肩の丸み
+  fillCircle(px, w, h, cx - r * 0.85, bodyTop + r * 0.2, r * 0.42, C.SUIT);
+  fillCircle(px, w, h, cx + r * 0.85, bodyTop + r * 0.2, r * 0.42, C.SUIT);
+  // 胸部コントロールパネル
+  fillRect(px, w, h, cx - r * 0.35, bodyTop + r * 0.55, r * 0.7, r * 0.45, C.ACCENT);
+
+  // ヘルメット（球体）
+  fillCircle(px, w, h, cx, cy, r, C.SUIT);
+  // バイザー（暗いガラス）
+  fillCircle(px, w, h, cx, cy + r * 0.05, r * 0.66, C.VISOR);
+  // バイザー反射（ハイライト）
+  fillCircle(px, w, h, cx - r * 0.26, cy - r * 0.22, r * 0.2, C.VISOR_GLOW);
 }
 
 function generateIcon(size) {
@@ -154,53 +164,13 @@ function generateIcon(size) {
 
   // 星々
   for (const [sx, sy, sr] of [
-    [70, 300, 2], [120, 430, 1.5], [250, 260, 1.5], [300, 430, 2], [430, 320, 1.5],
-    [450, 440, 2], [190, 350, 1.5], [380, 380, 1.5], [60, 120, 1.5], [470, 130, 2],
+    [70, 300, 2], [120, 430, 1.5], [250, 80, 1.5], [300, 430, 2], [430, 320, 1.5],
+    [450, 440, 2], [110, 110, 1.5], [380, 110, 1.5], [60, 380, 1.5], [470, 200, 2],
   ]) fillCircle(px, w, h, S(sx), S(sy), Math.max(1, S(sr)), C.STAR);
 
-  // コロニー外壁（枠）
-  const bw = Math.max(2, Math.round(S(28)));
-  fillRect(px, w, h, 0, 0, w, bw, C.WALL);
-  fillRect(px, w, h, 0, h - bw, w, bw, C.WALL);
-  fillRect(px, w, h, 0, 0, bw, h, C.WALL);
-  fillRect(px, w, h, w - bw, 0, bw, h, C.WALL);
-
-  // コロニー通路（内壁アクセント）
-  for (const [x, y, rw, rh] of [
-    [56, 60, 120, 22], [336, 60, 120, 22], [56, 60, 22, 70], [434, 60, 22, 70],
-  ]) fillRect(px, w, h, S(x), S(y), S(rw), S(rh), C.WALL);
-
-  // コア（グロー＋本体）
-  for (const cxv of [110, 402]) {
-    fillCircle(px, w, h, S(cxv), S(120), S(26), C.CORE_GLOW);
-    fillCircle(px, w, h, S(cxv), S(120), S(15), C.CORE);
-  }
-
-  // エネルギー結晶（ドット）
-  for (const [dx, dy] of [[180, 120], [256, 120], [332, 120], [256, 200]])
-    fillCircle(px, w, h, S(dx), S(dy), Math.max(2, S(9)), C.CRYSTAL);
-
-  // エイリアン2体
-  drawAlien(px, w, h, S(150), S(185), S(54), C.ALIEN_RED);
-  drawAlien(px, w, h, S(378), S(205), S(46), C.ALIEN_CYAN);
-
-  // 自機（宇宙船・右向き、中心 240,330 / r=86）
-  const scx = S(240), scy = S(330), sr = S(86);
-  // 推進炎
-  fillPoly(px, w, h, [
-    [scx - 0.9 * sr, scy - 0.35 * sr],
-    [scx - 1.8 * sr, scy],
-    [scx - 0.9 * sr, scy + 0.35 * sr],
-  ], C.THRUSTER);
-  // 船体
-  fillPoly(px, w, h, [
-    [scx + sr, scy],
-    [scx - 0.85 * sr, scy - 0.8 * sr],
-    [scx - 0.5 * sr, scy],
-    [scx - 0.85 * sr, scy + 0.8 * sr],
-  ], C.SHIP);
-  // コックピット
-  fillCircle(px, w, h, scx + 0.15 * sr, scy, 0.28 * sr, C.COCKPIT);
+  // 宇宙飛行士（中央配置・ヘルメット中心 256,190 / r=92）
+  // maskable のセーフゾーン内に収まるよう中央寄せ
+  drawAstronaut(px, w, h, S(256), S(186), S(92));
 
   return encodePNG(w, h, px);
 }

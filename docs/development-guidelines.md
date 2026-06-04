@@ -377,7 +377,7 @@ describe('GhostManager', () => {
 |-----------|---------|
 | スワイプ操作（上下左右） | iPhone Safari / Android Chrome |
 | 壁にぶつかった際のピタッと停止 | 上記と同じ |
-| 全ドット収集 → ステージクリア | Chrome PC |
+| 敵全滅（レーザー／パワーエサ）→ ステージクリア | Chrome PC |
 | 残機0 → ゲームオーバー | Chrome PC |
 | ページリロード後のハイスコア保持 | Chrome PC |
 | PWA インストール → オフライン起動 | iOS / Android |

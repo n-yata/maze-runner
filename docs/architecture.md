@@ -277,7 +277,7 @@ document.addEventListener('pointerdown', () => {
 
 ### 統合テスト（手動）
 - ゲームループ起動 → 60fps の維持確認（Chrome DevTools Performance タブ）
-- 全ドット収集 → ステージクリア遷移の確認
+- 敵全滅 → ステージクリア遷移の確認
 
 ### 手動E2Eテスト（実機）
 - iPhone（Safari）・Android（Chrome）でのスワイプ操作確認

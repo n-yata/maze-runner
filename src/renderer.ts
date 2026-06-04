@@ -9,6 +9,7 @@ import type { GhostManager } from './ghost.js';
 import type { FruitManager } from './fruit.js';
 import { Starfield } from './background.js';
 import type { ParticleSystem } from './particles.js';
+import type { LaserManager } from './laser.js';
 
 const UI_HEIGHT = 4 * TILE_SIZE;
 const MAP_OFFSET_Y = UI_HEIGHT;
@@ -46,6 +47,7 @@ export class Renderer {
     ghostMgr: GhostManager,
     fruitMgr: FruitManager,
     particles?: ParticleSystem,
+    laser?: LaserManager,
   ): void {
     const ctx = this.ctx;
 
@@ -61,7 +63,7 @@ export class Renderer {
 
     switch (state.phase) {
       case 'TITLE':
-        map.drawTo(ctx, MAP_OFFSET_Y);
+        // マップは表示せず、背景の星空＋ロゴ＋光のみで魅せる
         this.drawTitle(state.phaseTimer);
         break;
 
@@ -80,6 +82,7 @@ export class Renderer {
         this.drawFruit(fruitMgr);
         this.drawGhosts(ghostMgr, ghostMgr.getFrightenedEndWarning());
         this.drawPlayer(player);
+        if (laser) this.drawLaser(laser);
         break;
 
       case 'PAUSED':
@@ -435,6 +438,38 @@ export class Renderer {
     }
   }
 
+  /** レーザービーム（発光する短い軌跡）を加算合成で描く。座標は盤面ローカル。 */
+  private drawLaser(laser: LaserManager): void {
+    const beams = laser.getBeams();
+    if (beams.length === 0) return;
+    const ctx = this.ctx;
+    const len = TILE_SIZE * 0.8; // 軌跡の長さ
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.lineCap = 'round';
+    for (const b of beams) {
+      const x = b.x;
+      const y = b.y + MAP_OFFSET_Y;
+      const tailX = x - b.dx * len;
+      const tailY = y - b.dy * len;
+      // 外側のグロー（太く淡い赤）
+      ctx.strokeStyle = 'rgba(255,77,94,0.5)';
+      ctx.lineWidth = 6;
+      ctx.beginPath();
+      ctx.moveTo(tailX, tailY);
+      ctx.lineTo(x, y);
+      ctx.stroke();
+      // 芯（細く明るい白）
+      ctx.strokeStyle = '#FFFFFF';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(tailX, tailY);
+      ctx.lineTo(x, y);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
   /** 明滅するプロンプト用アルファ。 */
   private pulseAlpha(): number {
     return 0.55 + 0.45 * Math.sin(performance.now() / 320);
@@ -456,30 +491,36 @@ export class Renderer {
     const cy = CANVAS_HEIGHT / 2;
     const t = performance.now() / 1000;
 
-    this.drawPanel(cy, 130);
-
-    // 宇宙飛行士の浮遊（ロゴ上空を左右へゆっくり往復しつつ歩行アニメ）
-    const driftX = Math.sin(t * 0.6) * (CANVAS_WIDTH * 0.26);
-    const facing: Direction = Math.cos(t * 0.6) >= 0 ? 'RIGHT' : 'LEFT';
-    const floatY = cy - 96 + Math.sin(t * 1.3) * 6;
+    // ロゴ背後の放射状グロー（ゆっくり脈動するソフトな光）
+    const pulse = 0.85 + 0.15 * Math.sin(t * 1.2);
+    const glowR = CANVAS_WIDTH * 0.62 * pulse;
+    const glow = ctx.createRadialGradient(cx, cy - 24, 0, cx, cy - 24, glowR);
+    glow.addColorStop(0, 'rgba(125,240,255,0.28)');
+    glow.addColorStop(0.5, 'rgba(92,140,255,0.10)');
+    glow.addColorStop(1, 'rgba(5,6,15,0)');
     ctx.save();
-    ctx.translate(cx + driftX, floatY);
-    this.drawAstronautBody(TILE_SIZE * 0.8, facing, t * 0.8);
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.fillStyle = glow;
+    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
     ctx.restore();
+
+    // ロゴ下を横切る細い光のライン（スタイリッシュなアクセント）
+    const lineAlpha = 0.25 + 0.2 * Math.sin(t * 1.6);
+    this.glowText('━━━━━━━━', cx, cy + 6, `${TILE_SIZE}px monospace`, '#7DF0FF', 10, 'center', lineAlpha);
 
     // ロゴ登場（最初の約0.6秒でフェードイン＋ポップイン: drawReady と同系の ease-out）
     const k = Math.min(1, timer / 0.6);
     const scale = 0.5 + 0.5 * k * (2 - k);
     ctx.save();
-    ctx.translate(cx, cy - 30);
+    ctx.translate(cx, cy - 24);
     ctx.scale(scale, scale);
-    this.glowText('STELLAR RUN', 0, 0, `bold ${TILE_SIZE * 2}px monospace`, '#7DF0FF', 16, 'center', k);
-    this.glowText('ステラー・ラン', 0, 28, `${TILE_SIZE}px monospace`, '#9FD0FF', 8, 'center', k);
+    this.glowText('STELLAR RUN', 0, 0, `bold ${TILE_SIZE * 2}px monospace`, '#7DF0FF', 18, 'center', k);
+    this.glowText('ステラー・ラン', 0, 30, `${TILE_SIZE}px monospace`, '#9FD0FF', 8, 'center', k);
     ctx.restore();
 
-    // 開始導線（既存どおり維持）
-    this.glowText('Press SPACE / Tap', cx, cy + 36, `${TILE_SIZE}px monospace`, '#FFFFFF', 8, 'center', this.pulseAlpha());
-    this.glowText('Arrows / WASD / Swipe', cx, cy + 60, `${TILE_SIZE - 3}px monospace`, '#8FB8E0', 4);
+    // 開始導線
+    this.glowText('Press SPACE / Tap', cx, cy + 52, `${TILE_SIZE}px monospace`, '#FFFFFF', 8, 'center', this.pulseAlpha());
+    this.glowText('Arrows / WASD / Swipe', cx, cy + 76, `${TILE_SIZE - 3}px monospace`, '#8FB8E0', 4);
   }
 
   private drawReady(timer: number): void {

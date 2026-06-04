@@ -536,7 +536,7 @@ stateDiagram-v2
     PLAYER_DEAD --> READY: 残機あり（1.5秒後）
     PLAYER_DEAD --> GAME_OVER: 残機0（1.5秒後）
 
-    PLAYING --> STAGE_CLEAR: 全ドット収集
+    PLAYING --> STAGE_CLEAR: 敵全滅
     STAGE_CLEAR --> READY: 2秒後（次レベル）
 
     GAME_OVER --> TITLE: タップ/スペースキー（3秒後有効化）
@@ -672,7 +672,7 @@ stateDiagram-v2
 
 ### 手動テスト（E2E相当）
 - スマホ実機（iPhone / Android）でのスワイプ操作の反応確認
-- 全ドット収集 → ステージクリア遷移
+- 敵全滅（レーザー／パワーエサ）→ ステージクリア遷移
 - 残機0 → ゲームオーバー遷移
 - ページリロード後にハイスコアが保持されること
 - PWA インストール後のオフライン動作
