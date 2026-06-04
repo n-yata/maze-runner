@@ -218,6 +218,25 @@ describe('GhostManager', () => {
       expect(score).toBeGreaterThan(0);
     });
 
+    it('eating a frightened ghost never kills the player (pre+post move re-hit)', () => {
+      const { map, player, audio } = makeDeps();
+      const blinky = mgr.ghosts.find(g => g.name === 'BLINKY')!;
+
+      // Overlap the player so both the pre-move and post-move collision checks fire
+      const playerPx = player.getPixelPos();
+      (blinky as any).pixelPos = { x: playerPx.x + 2, y: playerPx.y };
+      (blinky as any).pos = { x: Math.floor((playerPx.x + 2) / TILE_SIZE), y: Math.floor(playerPx.y / TILE_SIZE) };
+      blinky.mode = 'FRIGHTENED';
+      blinky.frightenedTimer = 5.0;
+
+      mgr.update(1 / 60, map, player, audio, 0);
+
+      // Ghost is eaten (VANISHED) and the player must survive — the now-VANISHED
+      // ghost on the same tile must NOT trigger a death on the post-move check.
+      expect(blinky.mode).toBe('VANISHED');
+      expect(player.state.isDead).toBe(false);
+    });
+
     it('frightened ghost is counted only once per update even with pre+post move checks', () => {
       const { map, player, audio } = makeDeps();
       const blinky = mgr.ghosts.find(g => g.name === 'BLINKY')!;

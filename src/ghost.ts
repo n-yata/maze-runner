@@ -176,6 +176,9 @@ export class GhostManager {
       };
 
       const handleCollision = (): void => {
+        // 既に撃破済み（VANISHED）の敵は無害。移動前チェックで食べた直後、
+        // 移動後チェックで同じ敵に再ヒットしてプレイヤーが死ぬ誤判定を防ぐ。
+        if (g.mode === 'VANISHED') return;
         if (g.mode === 'FRIGHTENED') {
           const eatIdx = Math.min(g.eatenScore, GHOST_EAT_SCORES.length - 1);
           scoreGained += GHOST_EAT_SCORES[eatIdx] ?? 200;
