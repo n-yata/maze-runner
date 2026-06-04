@@ -245,11 +245,11 @@ export class GameLoop {
       this.ghostMgr.triggerFrightened();
     }
 
-    const ghostScore = this.ghostMgr.update(dt, this.map, this.player, this.audio, this.state.dotsEaten);
+    const ghostScore = this.ghostMgr.update(
+      dt, this.map, this.player, this.audio, this.state.dotsEaten,
+      (pos) => this.particles.spawnBurst(pos.x, pos.y, '#FFFFFF', 18, 110), // 撃破スパークは敵の位置で
+    );
     this.state.score += ghostScore;
-    if (ghostScore > 0) {
-      this.particles.spawnBurst(ppos.x, ppos.y, '#FFFFFF', 18, 110); // 撃破スパーク
-    }
 
     // フルーツ＝レーザー発動アイテム。敵が残る限り繰り返し出現させる（詰み防止）。
     // getValidFruitPositions() はマップ固定のキャッシュ参照（O(1)）
@@ -265,10 +265,10 @@ export class GameLoop {
     // レーザー（進行方向へ自動連射）。敵ヒットで撃破＝スコア加算。
     const laserScore = this.laser.update(
       dt, this.player.getPixelPos(), this.player.state.dir, this.map, this.ghostMgr,
+      (pos) => this.particles.spawnBurst(pos.x, pos.y, '#FF4D5E', 18, 110), // レーザー撃破スパークは敵の位置で
     );
     if (laserScore > 0) {
       this.state.score += laserScore;
-      this.particles.spawnBurst(ppos.x, ppos.y, '#FF4D5E', 18, 110); // レーザー撃破スパーク
       this.audio.play('EAT_GHOST');
     }
 

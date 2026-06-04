@@ -87,6 +87,7 @@ export class LaserManager {
     playerDir: Direction,
     map: MapManager,
     ghostMgr: GhostManager,
+    onDefeat?: (pos: Vec2) => void,
   ): number {
     if (this.modeTimer > 0) {
       this.modeTimer -= dt;
@@ -120,7 +121,7 @@ export class LaserManager {
         continue;
       }
       // 敵ヒットで撃破
-      const hit = ghostMgr.defeatAt(b.x, b.y, LASER_HIT_RADIUS);
+      const hit = ghostMgr.defeatAt(b.x, b.y, LASER_HIT_RADIUS, onDefeat);
       if (hit > 0) {
         score += hit;
         b.active = false;

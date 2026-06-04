@@ -125,6 +125,7 @@ export class GhostManager {
     player: PlayerManager,
     audio: AudioManager,
     dotsEaten: number,
+    onDefeat?: (pos: Vec2) => void,
   ): number {
     let scoreGained = 0;
 
@@ -184,6 +185,7 @@ export class GhostManager {
           scoreGained += GHOST_EAT_SCORES[eatIdx] ?? 200;
           g.eatenScore++;
           g.mode = 'VANISHED'; // その場で即消滅（目玉移動なし）
+          onDefeat?.({ x: g.pixelPos.x, y: g.pixelPos.y }); // 撃破スパークは敵の位置で
           audio.play('EAT_GHOST');
         } else {
           player.die();
@@ -360,7 +362,7 @@ export class GhostManager {
    * モードを問わず撃破でき（レーザーは武器）、連続加点(GHOST_EAT_SCORES)に基づくスコアを返す。
    * 1回の呼び出しで撃破するのは最大1体（1ビーム＝1体）。撃破がなければ 0。
    */
-  defeatAt(px: number, py: number, radius: number): number {
+  defeatAt(px: number, py: number, radius: number, onDefeat?: (pos: Vec2) => void): number {
     const r2 = radius * radius;
     for (const g of this.ghosts) {
       if (g.mode === 'VANISHED') continue;
@@ -371,6 +373,7 @@ export class GhostManager {
         const score = GHOST_EAT_SCORES[eatIdx] ?? 200;
         g.eatenScore++;
         g.mode = 'VANISHED';
+        onDefeat?.({ x: g.pixelPos.x, y: g.pixelPos.y }); // 撃破スパークは敵の位置で
         return score;
       }
     }
