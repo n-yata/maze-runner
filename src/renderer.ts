@@ -62,7 +62,7 @@ export class Renderer {
     switch (state.phase) {
       case 'TITLE':
         map.drawTo(ctx, MAP_OFFSET_Y);
-        this.drawTitle();
+        this.drawTitle(state.phaseTimer);
         break;
 
       case 'READY':
@@ -331,10 +331,7 @@ export class Renderer {
     const py = g.pixelPos.y + MAP_OFFSET_Y;
     const r = TILE_SIZE / 2 - 1;
 
-    if (g.mode === 'EATEN') {
-      this.drawEyes(px, py, r);
-      return;
-    }
+    if (g.mode === 'VANISHED') return; // 消滅した敵は描画しない
 
     const frightened = g.mode === 'FRIGHTENED';
     let bodyColor: string;
@@ -438,25 +435,6 @@ export class Renderer {
     }
   }
 
-  private drawEyes(cx: number, cy: number, r: number): void {
-    const ctx = this.ctx;
-    const eyeOffX = r * 0.35;
-    const eyeOffY = -r * 0.15;
-    const eyeR = r * 0.3;
-
-    ctx.fillStyle = COLORS.GHOST_EATEN_EYES;
-    ctx.beginPath();
-    ctx.arc(cx - eyeOffX, cy + eyeOffY, eyeR, 0, Math.PI * 2);
-    ctx.arc(cx + eyeOffX, cy + eyeOffY, eyeR, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.fillStyle = COLORS.GHOST_EATEN_PUPIL;
-    ctx.beginPath();
-    ctx.arc(cx - eyeOffX, cy + eyeOffY, eyeR * 0.5, 0, Math.PI * 2);
-    ctx.arc(cx + eyeOffX, cy + eyeOffY, eyeR * 0.5, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
   /** 明滅するプロンプト用アルファ。 */
   private pulseAlpha(): number {
     return 0.55 + 0.45 * Math.sin(performance.now() / 320);
@@ -472,15 +450,36 @@ export class Renderer {
     ctx.fillRect(0, cy - half, CANVAS_WIDTH, half * 2);
   }
 
-  private drawTitle(): void {
+  private drawTitle(timer: number): void {
+    const ctx = this.ctx;
     const cx = CANVAS_WIDTH / 2;
     const cy = CANVAS_HEIGHT / 2;
+    const t = performance.now() / 1000;
 
-    this.drawPanel(cy, 110);
-    this.glowText('STELLAR RUN', cx, cy - 40, `bold ${TILE_SIZE * 2}px monospace`, '#7DF0FF', 16);
-    this.glowText('ステラー・ラン', cx, cy - 12, `${TILE_SIZE}px monospace`, '#9FD0FF', 8);
-    this.glowText('Press SPACE / Tap', cx, cy + 24, `${TILE_SIZE}px monospace`, '#FFFFFF', 8, 'center', this.pulseAlpha());
-    this.glowText('Arrows / WASD / Swipe', cx, cy + 48, `${TILE_SIZE - 3}px monospace`, '#8FB8E0', 4);
+    this.drawPanel(cy, 130);
+
+    // 宇宙飛行士の浮遊（ロゴ上空を左右へゆっくり往復しつつ歩行アニメ）
+    const driftX = Math.sin(t * 0.6) * (CANVAS_WIDTH * 0.26);
+    const facing: Direction = Math.cos(t * 0.6) >= 0 ? 'RIGHT' : 'LEFT';
+    const floatY = cy - 96 + Math.sin(t * 1.3) * 6;
+    ctx.save();
+    ctx.translate(cx + driftX, floatY);
+    this.drawAstronautBody(TILE_SIZE * 0.8, facing, t * 0.8);
+    ctx.restore();
+
+    // ロゴ登場（最初の約0.6秒でフェードイン＋ポップイン: drawReady と同系の ease-out）
+    const k = Math.min(1, timer / 0.6);
+    const scale = 0.5 + 0.5 * k * (2 - k);
+    ctx.save();
+    ctx.translate(cx, cy - 30);
+    ctx.scale(scale, scale);
+    this.glowText('STELLAR RUN', 0, 0, `bold ${TILE_SIZE * 2}px monospace`, '#7DF0FF', 16, 'center', k);
+    this.glowText('ステラー・ラン', 0, 28, `${TILE_SIZE}px monospace`, '#9FD0FF', 8, 'center', k);
+    ctx.restore();
+
+    // 開始導線（既存どおり維持）
+    this.glowText('Press SPACE / Tap', cx, cy + 36, `${TILE_SIZE}px monospace`, '#FFFFFF', 8, 'center', this.pulseAlpha());
+    this.glowText('Arrows / WASD / Swipe', cx, cy + 60, `${TILE_SIZE - 3}px monospace`, '#8FB8E0', 4);
   }
 
   private drawReady(timer: number): void {

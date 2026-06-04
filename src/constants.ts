@@ -10,7 +10,6 @@ export const CANVAS_HEIGHT = (ROWS + 4) * TILE_SIZE; // extra rows for score UI
 export const PLAYER_SPEED = 5.5; // tiles per second
 export const GHOST_SPEED = 4.5;  // プレイヤー(5.5)より少し遅く
 export const FRIGHTENED_SPEED = 3.0;
-export const EATEN_SPEED = 12.0;
 
 export const FRIGHTENED_DURATION = 6.0; // seconds
 
@@ -19,7 +18,7 @@ export const PLAYER_START: Vec2 = { x: 7, y: 19 };
 export const GHOST_HOUSE_CENTER: Vec2 = { x: 7, y: 12 };
 export const GHOST_HOUSE_DOOR: Vec2 = { x: 7, y: 9 };
 
-// Column range of the ghost house interior+door (used to restrict non-EATEN ghosts from re-entering)
+// Column range of the ghost house interior+door (used to restrict ghosts from re-entering)
 export const GHOST_HOUSE_COLS: [number, number] = [5, 9];
 
 export const GHOST_STARTS: Record<GhostName, Vec2> = {
@@ -66,8 +65,6 @@ export const COLORS = {
   PLAYER:      '#9FD0FF',         // 宇宙船ハル
   GHOST_FRIGHTENED:     '#2A2AE0',
   GHOST_FRIGHTENED_END: '#FFFFFF',
-  GHOST_EATEN_EYES:     '#FFFFFF',
-  GHOST_EATEN_PUPIL:    '#2A2AE0',
   SCORE_TEXT:  '#FFFFFF',
   LIFE_COLOR:  '#9FD0FF',
   SHIP_THRUSTER: '#FF8A3C',       // 推進炎

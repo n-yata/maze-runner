@@ -44,11 +44,11 @@ describe('GhostManager', () => {
     }
   });
 
-  it('triggerFrightened does not affect EATEN ghosts', () => {
+  it('triggerFrightened does not affect VANISHED ghosts', () => {
     const blinky = mgr.ghosts.find(g => g.name === 'BLINKY')!;
-    blinky.mode = 'EATEN';
+    blinky.mode = 'VANISHED';
     mgr.triggerFrightened();
-    expect(blinky.mode).toBe('EATEN');
+    expect(blinky.mode).toBe('VANISHED');
   });
 
   it('triggerFrightened saves previous mode', () => {
@@ -214,7 +214,7 @@ describe('GhostManager', () => {
 
       const score = mgr.update(1 / 60, map, player, audio, 0);
 
-      expect(blinky.mode).toBe('EATEN');
+      expect(blinky.mode).toBe('VANISHED');
       expect(score).toBeGreaterThan(0);
     });
 
@@ -235,18 +235,62 @@ describe('GhostManager', () => {
       expect(blinky.eatenScore).toBe(1);
     });
 
-    it('EATEN ghost does not trigger collision when overlapping player', () => {
+    it('VANISHED ghost does not trigger collision when overlapping player', () => {
       const { map, player, audio } = makeDeps();
       const blinky = mgr.ghosts.find(g => g.name === 'BLINKY')!;
 
       const playerPx = player.getPixelPos();
       (blinky as any).pixelPos = { x: playerPx.x + 2, y: playerPx.y };
       (blinky as any).pos = { x: Math.floor((playerPx.x + 2) / TILE_SIZE), y: Math.floor(playerPx.y / TILE_SIZE) };
-      blinky.mode = 'EATEN';
+      blinky.mode = 'VANISHED';
 
       mgr.update(1 / 60, map, player, audio, 0);
 
       expect(player.state.isDead).toBe(false);
+    });
+  });
+
+  describe('vanish behavior (defeated ghosts)', () => {
+    it('eating a frightened ghost sets it to VANISHED with consecutive score', () => {
+      const { map, player, audio } = makeDeps();
+      const blinky = mgr.ghosts.find(g => g.name === 'BLINKY')!;
+
+      const playerPx = player.getPixelPos();
+      (blinky as any).pixelPos = { x: playerPx.x + 5, y: playerPx.y };
+      (blinky as any).pos = { x: Math.floor((playerPx.x + 5) / TILE_SIZE), y: Math.floor(playerPx.y / TILE_SIZE) };
+      blinky.mode = 'FRIGHTENED';
+      blinky.frightenedTimer = 5.0;
+
+      const score = mgr.update(1 / 60, map, player, audio, 0);
+
+      expect(blinky.mode).toBe('VANISHED');
+      expect(score).toBe(200);
+    });
+
+    it('a VANISHED ghost does not move on subsequent updates', () => {
+      const { map, player, audio } = makeDeps();
+      const blinky = mgr.ghosts.find(g => g.name === 'BLINKY')!;
+      blinky.mode = 'VANISHED';
+      const before = { x: blinky.pixelPos.x, y: blinky.pixelPos.y };
+
+      for (let i = 0; i < 60; i++) {
+        mgr.update(1 / 60, map, player, audio, 0);
+      }
+
+      expect(blinky.pixelPos.x).toBe(before.x);
+      expect(blinky.pixelPos.y).toBe(before.y);
+    });
+
+    it('reset revives a VANISHED ghost back to SCATTER at its start tile', () => {
+      const blinky = mgr.ghosts.find(g => g.name === 'BLINKY')!;
+      blinky.mode = 'VANISHED';
+
+      mgr.reset();
+
+      const revived = mgr.ghosts.find(g => g.name === 'BLINKY')!;
+      expect(revived.mode).toBe('SCATTER');
+      expect(revived.pos.x).toBe(GHOST_STARTS['BLINKY'].x);
+      expect(revived.pos.y).toBe(GHOST_STARTS['BLINKY'].y);
     });
   });
 

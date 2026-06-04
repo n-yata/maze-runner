@@ -9,7 +9,6 @@ import {
   GHOST_RELEASE_DOT_THRESHOLDS,
   GHOST_SPEED,
   FRIGHTENED_SPEED,
-  EATEN_SPEED,
   FRIGHTENED_DURATION,
   MODE_SCHEDULE,
   GHOST_EAT_SCORES,
@@ -112,7 +111,7 @@ export class GhostManager {
 
   triggerFrightened(): void {
     for (const g of this.ghosts) {
-      if (g.mode !== 'EATEN') {
+      if (g.mode !== 'VANISHED') {
         g.prevMode = g.mode;
         g.mode = 'FRIGHTENED';
         g.frightenedTimer = this.frightenedDur;
@@ -139,7 +138,7 @@ export class GhostManager {
       this.inHouse.delete('CLYDE');
     }
 
-    // Global mode timer (only affects non-FRIGHTENED, non-EATEN)
+    // Global mode timer (only affects SCATTER/CHASE ghosts)
     this.modeTimer += dt;
     if (this.modeIndex < this.modeSchedule.length) {
       if (this.modeTimer >= (this.modeSchedule[this.modeIndex] ?? Infinity)) {
@@ -157,6 +156,9 @@ export class GhostManager {
     const blinky = this.ghosts.find(g => g.name === 'BLINKY')!;
 
     for (const g of this.ghosts) {
+      // 消滅した敵は移動・衝突・描画の対象外（そのステージ中は復活しない）
+      if (g.mode === 'VANISHED') continue;
+
       // Update frightened timer
       if (g.mode === 'FRIGHTENED') {
         g.frightenedTimer -= dt;
@@ -166,7 +168,6 @@ export class GhostManager {
       }
 
       const checkCollision = (): boolean => {
-        if (g.mode === 'EATEN') return false;
         const playerPx = player.getPixelPos();
         const cdx = g.pixelPos.x - playerPx.x;
         const cdy = g.pixelPos.y - playerPx.y;
@@ -179,7 +180,7 @@ export class GhostManager {
           const eatIdx = Math.min(g.eatenScore, GHOST_EAT_SCORES.length - 1);
           scoreGained += GHOST_EAT_SCORES[eatIdx] ?? 200;
           g.eatenScore++;
-          g.mode = 'EATEN';
+          g.mode = 'VANISHED'; // その場で即消滅（目玉移動なし）
           audio.play('EAT_GHOST');
         } else {
           player.die();
@@ -210,9 +211,7 @@ export class GhostManager {
     player: PlayerManager,
     blinky: GhostState,
   ): void {
-    const speed = g.mode === 'FRIGHTENED' ? this.frightenedSpd
-                : g.mode === 'EATEN'      ? EATEN_SPEED
-                : this.ghostSpeed;
+    const speed = g.mode === 'FRIGHTENED' ? this.frightenedSpd : this.ghostSpeed;
     const dist = speed * TILE_SIZE * dt;
 
     const col = tileOf(g.pixelPos.x);
@@ -275,10 +274,10 @@ export class GhostManager {
       const nc = col + dx;
       const nr = row + dy;
       if (map.isWall(nc, nr)) continue;
-      // 復活(EATEN)以外のゴーストはハウス上壁の隙間（ドア行）から再進入できない。
+      // ゴーストはハウス上壁の隙間（ドア行）から再進入できない。
       // 出口（上方向）は許可し、外からの下方向進入のみ禁止する。列範囲は GHOST_HOUSE_COLS で判定。
       const doorGapRow = GHOST_HOUSE_DOOR.y + 1;
-      if (g.mode !== 'EATEN' && dir === 'DOWN' && nr === doorGapRow &&
+      if (dir === 'DOWN' && nr === doorGapRow &&
           nc >= GHOST_HOUSE_COLS[0] && nc <= GHOST_HOUSE_COLS[1]) continue;
 
       const d = dist2({ x: nc, y: nr }, target);
@@ -302,9 +301,6 @@ export class GhostManager {
     player: PlayerManager,
     blinky: GhostState,
   ): Vec2 {
-    if (g.mode === 'EATEN') {
-      return GHOST_HOUSE_DOOR;
-    }
     if (g.mode === 'SCATTER') {
       return GHOST_SCATTER_TARGETS[g.name];
     }

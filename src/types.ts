@@ -9,7 +9,7 @@ export type TileType =
 
 export type Direction = 'UP' | 'DOWN' | 'LEFT' | 'RIGHT' | 'NONE';
 
-export type GhostMode = 'SCATTER' | 'CHASE' | 'FRIGHTENED' | 'EATEN';
+export type GhostMode = 'SCATTER' | 'CHASE' | 'FRIGHTENED' | 'VANISHED';
 
 export type GhostName = 'BLINKY' | 'PINKY' | 'INKY' | 'CLYDE';
 

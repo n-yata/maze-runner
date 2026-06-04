@@ -157,6 +157,7 @@ export class GameLoop {
 
     switch (this.state.phase) {
       case 'TITLE':
+        this.state.phaseTimer += dt; // タイトル演出（ロゴ登場・飛行士浮遊）の駆動
         break;
 
       case 'READY':
