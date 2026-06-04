@@ -104,6 +104,9 @@ export class MapManager {
   private tiles: TileType[];
   private dotState: boolean[]; // true = dot/power still present
   private totalDots: number;
+  private remainingDots: number = 0;       // dotState の true 数を逐次保持（毎フレームの全走査を回避）
+  private powerDotCount: number = 0;        // 残存パワーエサ数を逐次保持
+  private validFruitPositions: Vec2[] = []; // 通路(type=2)位置はマップ固定 → 構築時に1回だけ計算
   private offscreen: OffscreenCanvas | null = null;
   private wallColor: string = getStageColors(1).wall;
   private wallInnerColor: string = getStageColors(1).inner;
@@ -113,7 +116,28 @@ export class MapManager {
     this.tiles = buildTiles(1);
     this.dotState = this.tiles.map(t => t === 2 || t === 3);
     this.totalDots = this.dotState.filter(Boolean).length;
+    this.recomputeCaches();
     this.buildOffscreenCanvas();
+  }
+
+  /** dotState/tiles から派生カウンタとフルーツ位置を一括再計算（構築・reset 時のみ）。 */
+  private recomputeCaches(): void {
+    let dots = 0;
+    let power = 0;
+    const fruitPos: Vec2[] = [];
+    for (let row = 0; row < ROWS; row++) {
+      for (let col = 0; col < COLS; col++) {
+        const i = row * COLS + col;
+        if (this.dotState[i]) {
+          dots++;
+          if (this.tiles[i] === 3) power++;
+        }
+        if (this.tiles[i] === 2) fruitPos.push({ x: col, y: row });
+      }
+    }
+    this.remainingDots = dots;
+    this.powerDotCount = power;
+    this.validFruitPositions = fruitPos;
   }
 
   private buildOffscreenCanvas(): void {
@@ -265,13 +289,15 @@ export class MapManager {
     const i = row * COLS + col;
     if (this.dotState[i]) {
       this.dotState[i] = false;
+      this.remainingDots--;
+      if (this.tiles[i] === 3) this.powerDotCount--;
       return true;
     }
     return false;
   }
 
   getRemainingDots(): number {
-    return this.dotState.filter(Boolean).length;
+    return this.remainingDots;
   }
 
   getTotalDots(): number {
@@ -279,17 +305,14 @@ export class MapManager {
   }
 
   getPowerDotCount(): number {
-    let count = 0;
-    for (let i = 0; i < this.tiles.length; i++) {
-      if (this.tiles[i] === 3 && this.dotState[i]) count++;
-    }
-    return count;
+    return this.powerDotCount;
   }
 
   reset(level: number = 1): void {
     this.tiles = buildTiles(level);
     this.dotState = this.tiles.map(t => t === 2 || t === 3);
     this.totalDots = this.dotState.filter(Boolean).length;
+    this.recomputeCaches();
     const colors = getStageColors(level);
     this.wallColor = colors.wall;
     this.wallInnerColor = colors.inner;
@@ -301,17 +324,10 @@ export class MapManager {
     return this.tileAt(col, row) !== 1;
   }
 
-  // フルーツは通路(type=2)上にスポーンする（dotState に依存しない）
+  // フルーツは通路(type=2)上にスポーンする（dotState に依存しない＝マップ固定）。
+  // recomputeCaches() で構築時に1回だけ算出したキャッシュを返す（呼び出し側は変更しない）。
   getValidFruitPositions(): Vec2[] {
-    const positions: Vec2[] = [];
-    for (let row = 0; row < ROWS; row++) {
-      for (let col = 0; col < COLS; col++) {
-        if (this.tileAt(col, row) === 2) {
-          positions.push({ x: col, y: row });
-        }
-      }
-    }
-    return positions;
+    return this.validFruitPositions;
   }
 
   wrapCol(col: number): number {

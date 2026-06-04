@@ -1,4 +1,4 @@
-import type { GameState, Vec2 } from './types.js';
+import type { GameState } from './types.js';
 import { INITIAL_LIVES, MAX_LEVEL, getLevelParams, COLORS, getFruitDef } from './constants.js';
 import { ParticleSystem } from './particles.js';
 import type { MapManager } from './map.js';
@@ -26,8 +26,6 @@ export class GameLoop {
   private rafId = 0;
   private lastPowerDotCount = -1;
   private particles = new ParticleSystem();
-  private validFruitPositionsCache: Vec2[] = [];
-  private fruitPosCacheDotsEaten = -1;
   private readonly boundLoop: FrameRequestCallback;
 
   constructor(
@@ -246,11 +244,8 @@ export class GameLoop {
       this.particles.spawnBurst(ppos.x, ppos.y, '#FFFFFF', 18, 110); // 撃破スパーク
     }
 
-    if (this.state.dotsEaten !== this.fruitPosCacheDotsEaten) {
-      this.validFruitPositionsCache = this.map.getValidFruitPositions();
-      this.fruitPosCacheDotsEaten = this.state.dotsEaten;
-    }
-    this.fruitMgr.checkSpawn(this.state.dotsEaten, this.state.level, this.validFruitPositionsCache);
+    // getValidFruitPositions() はマップ固定のキャッシュ参照（O(1)）
+    this.fruitMgr.checkSpawn(this.state.dotsEaten, this.state.level, this.map.getValidFruitPositions());
     const fruitScore = this.fruitMgr.update(dt, this.player.getPixelPos());
     if (fruitScore > 0) {
       this.state.score += fruitScore;

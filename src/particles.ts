@@ -66,19 +66,21 @@ export class ParticleSystem {
   }
 
   draw(ctx: CanvasRenderingContext2D, offsetY: number): void {
+    // 発光は shadowBlur ではなく加算合成('lighter')で表現する。
+    // shadowBlur 付き fill はモバイル Canvas で極めて重く、エサ連続取得で
+    // スパークが常時十数個描画されるとフレーム落ちの主因になるため使わない。
     ctx.save();
-    ctx.shadowBlur = 6; // 全パーティクル共通（ループ内で再設定しない）
+    ctx.globalCompositeOperation = 'lighter';
     for (const p of this.pool) {
       if (!p.active) continue;
       const a = Math.max(0, Math.min(1, p.life / p.maxLife));
       ctx.globalAlpha = a;
       ctx.fillStyle = p.color;
-      ctx.shadowColor = p.color;
       ctx.beginPath();
       ctx.arc(p.x, p.y + offsetY, p.size, 0, Math.PI * 2);
       ctx.fill();
     }
-    ctx.restore(); // globalAlpha/shadow はここで元に戻る
+    ctx.restore(); // globalAlpha/合成モードはここで元に戻る
   }
 
   /** テスト/リセット用: 全パーティクルを停止。 */
