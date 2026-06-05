@@ -15,6 +15,7 @@ export type GhostName = 'BLINKY' | 'PINKY' | 'INKY' | 'CLYDE';
 
 export type GamePhase =
   | 'TITLE'
+  | 'INTRO'
   | 'READY'
   | 'PLAYING'
   | 'PAUSED'
@@ -52,6 +53,7 @@ export interface GameState {
   highScore: number;
   lives: number;
   level: number;
+  partsCollected: number; // 回収した宇宙船の部品数(0〜MAX_LEVEL)。永続化せず1プレイで完結
   dotsEaten: number;
   modeTimer: number;
   modeIndex: number;

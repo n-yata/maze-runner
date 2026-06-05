@@ -1,7 +1,7 @@
 import type { GameState, GhostState, Direction } from './types.js';
 import {
   TILE_SIZE, CANVAS_WIDTH, CANVAS_HEIGHT,
-  COLORS, GHOST_COLORS, getFruitDef,
+  COLORS, GHOST_COLORS, getFruitDef, TOTAL_PARTS,
 } from './constants.js';
 import type { MapManager } from './map.js';
 import type { PlayerManager } from './player.js';
@@ -67,6 +67,11 @@ export class Renderer {
         this.drawTitle(state.phaseTimer);
         break;
 
+      case 'INTRO':
+        // 遭難の導入。盤面は出さず星空＋物語テキストで魅せる
+        this.drawIntro(state.phaseTimer);
+        break;
+
       case 'READY':
         map.drawTo(ctx, MAP_OFFSET_Y);
         map.drawDots(ctx, MAP_OFFSET_Y);
@@ -103,12 +108,13 @@ export class Renderer {
       case 'STAGE_CLEAR':
         map.drawTo(ctx, MAP_OFFSET_Y);
         map.drawDots(ctx, MAP_OFFSET_Y);
-        this.drawStageClear(state.phaseTimer);
+        this.drawStageClear(state.phaseTimer, state.partsCollected);
         break;
 
       case 'ALL_CLEAR':
+        // エンディング: 修理→発進の演出（盤面は背景的に残す）
         map.drawTo(ctx, MAP_OFFSET_Y);
-        this.drawAllClear();
+        this.drawEnding(state.phaseTimer, state.partsCollected);
         break;
 
       case 'GAME_OVER':
@@ -129,6 +135,9 @@ export class Renderer {
     this.glowText(`HI ${state.highScore}`, CANVAS_WIDTH - TILE_SIZE + 2, TILE_SIZE, scoreFont, COLORS.POWER_DOT, 6, 'right');
 
     this.glowText(`LV.${state.level}`, CANVAS_WIDTH - TILE_SIZE + 2, TILE_SIZE * 3, `${TILE_SIZE - 4}px monospace`, '#9FD0FF', 5, 'right');
+
+    // 部品回収の進捗（宇宙船修理の達成度）。HUD中央に配置
+    this.glowText(`部品 ${state.partsCollected}/${TOTAL_PARTS}`, CANVAS_WIDTH / 2, TILE_SIZE * 3, `${TILE_SIZE - 5}px monospace`, COLORS.POWER_DOT, 6, 'center');
 
     // Lives display（残機 = 宇宙飛行士アイコン）
     const ctx = this.ctx;
@@ -558,27 +567,139 @@ export class Renderer {
     this.glowText('ESC to resume', cx, cy + 32, `${TILE_SIZE}px monospace`, '#9FD0FF', 6);
   }
 
-  private drawAllClear(): void {
+  /** オープニング: 宇宙船の故障で遭難した導入を物語テキストで見せる。 */
+  private drawIntro(timer: number): void {
     const cx = CANVAS_WIDTH / 2;
     const cy = CANVAS_HEIGHT / 2;
-    this.drawPanel(cy, 100);
-    this.glowText('ALL CLEAR!', cx, cy - 20, `bold ${TILE_SIZE * 2}px monospace`, '#7DF0FF', 18);
-    this.glowText('おめでとう！', cx, cy + 14, `${TILE_SIZE}px monospace`, '#FFE66D', 8);
-    this.glowText('Press SPACE / Tap', cx, cy + 42, `${TILE_SIZE}px monospace`, '#FFFFFF', 8, 'center', this.pulseAlpha());
+    const fade = Math.min(1, timer / 0.6); // 全体のフェードイン
+
+    this.drawPanel(cy, 130);
+
+    // 警告ヘッダ（点滅で緊急感）
+    const warnAlpha = (0.5 + 0.5 * Math.sin(performance.now() / 220)) * fade;
+    this.glowText('⚠ 警告: 機体 大破', cx, cy - 92, `bold ${TILE_SIZE - 4}px monospace`, '#FF4D5E', 10, 'center', warnAlpha);
+
+    // 物語本文（1行ずつ少し遅れて現れる）
+    const lines = [
+      'エンジンが故障し',
+      'きみは深宇宙に取り残された',
+      '',
+      'エイリアンを退け',
+      '散らばった部品を集めろ',
+      '',
+      `${TOTAL_PARTS}つの部品で機体を直し`,
+      '故郷へ還るんだ',
+    ];
+    const lineH = TILE_SIZE - 2;
+    const startY = cy - 56;
+    for (let i = 0; i < lines.length; i++) {
+      const text = lines[i];
+      if (!text) continue;
+      const reveal = Math.min(1, Math.max(0, (timer - 0.4 - i * 0.25) / 0.4));
+      this.glowText(text, cx, startY + i * lineH, `${TILE_SIZE - 6}px monospace`, '#CFE6FF', 5, 'center', reveal);
+    }
+
+    // 開始導線
+    this.glowText('Press SPACE / Tap', cx, cy + 96, `${TILE_SIZE - 3}px monospace`, '#FFFFFF', 8, 'center', this.pulseAlpha() * fade);
   }
 
-  private drawStageClear(timer: number): void {
+  /** エンディング: 全部品回収 → 修理 → 発進の演出。timer(秒)で段階的に進む。 */
+  private drawEnding(timer: number, parts: number): void {
+    const cx = CANVAS_WIDTH / 2;
+    const cy = CANVAS_HEIGHT / 2;
+    this.drawPanel(cy, 120);
+
+    // 段階A(0-2.0s): 回収完了 → 修理開始
+    if (timer < 2.0) {
+      const k = Math.min(1, timer / 0.4);
+      this.glowText('全部品 回収完了', cx, cy - 40, `bold ${TILE_SIZE + 4}px monospace`, '#7DF0FF', 14, 'center', k);
+      this.glowText(`◇ ${parts}/${TOTAL_PARTS} ◇`, cx, cy - 6, `${TILE_SIZE}px monospace`, COLORS.POWER_DOT, 8, 'center', k);
+      this.glowText('宇宙船を 修理中...', cx, cy + 34, `${TILE_SIZE - 4}px monospace`, '#9FD0FF', 6, 'center', this.pulseAlpha());
+      return;
+    }
+
+    // 段階B(2.0-3.5s): システム復旧（グロー脈動）
+    if (timer < 3.5) {
+      const pulse = 0.6 + 0.4 * Math.sin((timer - 2.0) * 6);
+      this.glowText('修理 完了', cx, cy - 34, `bold ${TILE_SIZE + 4}px monospace`, '#46F0D8', 16, 'center', 1);
+      this.glowText('システム オールグリーン', cx, cy + 6, `${TILE_SIZE - 5}px monospace`, '#2BE0A8', 8, 'center', pulse);
+      this.drawRocket(cx, cy + 56, 0); // 発進前の機体
+      return;
+    }
+
+    // 段階C(3.5-5.0s): 発進
+    const lift = (timer - 3.5) / 1.5; // 0→1
+    const rocketY = cy + 56 - lift * (cy + 120); // 画面上方へ上昇
+    this.drawRocket(cx, rocketY, lift);
+    this.glowText('発進！', cx, cy - 30, `bold ${TILE_SIZE * 2}px monospace`, '#7DF0FF', 18, 'center', Math.min(1, lift * 2));
+    this.glowText('RESCUE COMPLETE', cx, cy + 4, `${TILE_SIZE - 4}px monospace`, '#FFE66D', 8, 'center', Math.min(1, lift * 2));
+    this.glowText('Press SPACE / Tap', cx, cy + 40, `${TILE_SIZE - 3}px monospace`, '#FFFFFF', 8, 'center', this.pulseAlpha());
+  }
+
+  /** 簡易ロケット。lift(0..1) でスラスター炎を伸ばし上昇感を出す。 */
+  private drawRocket(cx: number, cy: number, lift: number): void {
+    const ctx = this.ctx;
+    const r = TILE_SIZE * 0.6;
+    ctx.save();
+    ctx.translate(cx, cy);
+
+    // スラスター炎（上昇中ほど長く明るく）
+    const flame = r * (0.6 + lift * 1.8);
+    const flameGrad = ctx.createLinearGradient(0, r * 0.7, 0, r * 0.7 + flame);
+    flameGrad.addColorStop(0, COLORS.SHIP_THRUSTER);
+    flameGrad.addColorStop(1, 'rgba(255,138,60,0)');
+    ctx.fillStyle = flameGrad;
+    ctx.beginPath();
+    ctx.moveTo(-r * 0.4, r * 0.7);
+    ctx.lineTo(r * 0.4, r * 0.7);
+    ctx.lineTo(0, r * 0.7 + flame);
+    ctx.closePath();
+    ctx.fill();
+
+    // 機体（ハル）
+    ctx.fillStyle = COLORS.PLAYER;
+    ctx.beginPath();
+    ctx.moveTo(0, -r);
+    ctx.quadraticCurveTo(r * 0.7, -r * 0.2, r * 0.5, r * 0.7);
+    ctx.lineTo(-r * 0.5, r * 0.7);
+    ctx.quadraticCurveTo(-r * 0.7, -r * 0.2, 0, -r);
+    ctx.closePath();
+    ctx.fill();
+
+    // フィン
+    ctx.fillStyle = COLORS.SHIP_THRUSTER;
+    for (const side of [-1, 1]) {
+      ctx.beginPath();
+      ctx.moveTo(side * r * 0.5, r * 0.3);
+      ctx.lineTo(side * r * 0.85, r * 0.75);
+      ctx.lineTo(side * r * 0.5, r * 0.75);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    // コックピット
+    ctx.fillStyle = COLORS.SHIP_COCKPIT;
+    ctx.beginPath();
+    ctx.arc(0, -r * 0.15, r * 0.28, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+  }
+
+  private drawStageClear(timer: number, partsCollected: number): void {
     const ctx = this.ctx;
     const cx = CANVAS_WIDTH / 2;
     const cy = CANVAS_HEIGHT / 2;
     const k = Math.min(1, timer / 0.4);
     const scale = 0.5 + 0.5 * k * (2 - k);
-    this.drawPanel(cy, 55);
+    this.drawPanel(cy, 70);
     ctx.save();
-    ctx.translate(cx, cy + 6);
+    ctx.translate(cx, cy - 6);
     ctx.scale(scale, scale);
     this.glowText('STAGE CLEAR!', 0, 0, `bold ${TILE_SIZE * 2}px monospace`, '#46F0D8', 18);
     ctx.restore();
+    // 部品回収を明示（HUDの常時表示に加えクリア時の達成感を演出）
+    this.glowText(`部品 ${partsCollected}/${TOTAL_PARTS} 回収`, cx, cy + 36, `${TILE_SIZE - 4}px monospace`, COLORS.POWER_DOT, 8, 'center', k);
   }
 
   private drawGameOver(canInput: boolean): void {

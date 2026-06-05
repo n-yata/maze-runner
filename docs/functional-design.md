@@ -144,6 +144,7 @@ interface GameState {
   map: TileType[][];    // 28列 × 31行のグリッド
   dotsRemaining: number; // 残ドット数
   level: number;        // 現在レベル（1始まり）
+  partsCollected: number; // 回収した宇宙船の部品数（0〜MAX_LEVEL。永続化せず1プレイ完結）
   highScore: number;    // ハイスコア（localStorage から読み込み）
   frameCount: number;   // 総フレームカウント（タイマー管理用）
   frightenedEatChain: number; // 連鎖食べカウント（0〜4）
@@ -151,11 +152,13 @@ interface GameState {
 
 type GamePhase =
   | 'TITLE'       // タイトル画面
+  | 'INTRO'       // オープニング（遭難の導入。入力 or タイムアウトでステージ1へ）
   | 'READY'       // ゲーム開始前カウントダウン
   | 'PLAYING'     // プレイ中
   | 'PAUSED'      // 一時停止
   | 'PLAYER_DEAD' // プレイヤー死亡アニメーション
-  | 'STAGE_CLEAR' // ステージクリアアニメーション
+  | 'STAGE_CLEAR' // ステージクリアアニメーション（部品 n/3 回収を表示）
+  | 'ALL_CLEAR'   // エンディング（全部品回収→修理→発進演出）
   | 'GAME_OVER';  // ゲームオーバー画面
 ```
 

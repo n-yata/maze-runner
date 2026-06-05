@@ -94,6 +94,9 @@ export const GHOST_EAT_SCORES = [200, 400, 800, 1600] as const;
 export const INITIAL_LIVES = 3;
 export const MAX_LEVEL = 3;
 
+// 宇宙船の部品総数。各ステージのクリアで1個ずつ回収し、全部揃うと修理して脱出する
+export const TOTAL_PARTS = MAX_LEVEL;
+
 export const TUNNEL_COLS = [0, COLS - 1]; // x-column indices that are tunnels
 
 export type { GhostMode };

@@ -54,10 +54,34 @@ describe('GameLoop – phase transitions', () => {
     expect(state(loop).phase).toBe('TITLE');
   });
 
-  it('transitions TITLE → READY on start input', () => {
+  it('transitions TITLE → INTRO on start input (opening before stage 1)', () => {
     const { loop, audio } = makeGameLoop();
     audio.resume = vi.fn();
     // Simulate onStart callback
+    const onStart = (loop as unknown as { handleStart: () => void }).handleStart.bind(loop);
+    onStart();
+    expect(state(loop).phase).toBe('INTRO');
+  });
+
+  it('INTRO → READY automatically after INTRO_DURATION (7s)', () => {
+    const { loop } = makeGameLoop();
+    state(loop).phase = 'INTRO';
+    state(loop).phaseTimer = 0;
+    tickFor(loop, 7.1);
+    expect(state(loop).phase).toBe('READY');
+  });
+
+  it('stays in INTRO before INTRO_DURATION', () => {
+    const { loop } = makeGameLoop();
+    state(loop).phase = 'INTRO';
+    state(loop).phaseTimer = 0;
+    tickFor(loop, 5.0);
+    expect(state(loop).phase).toBe('INTRO');
+  });
+
+  it('INTRO → READY immediately on input (skip opening)', () => {
+    const { loop } = makeGameLoop();
+    state(loop).phase = 'INTRO';
     const onStart = (loop as unknown as { handleStart: () => void }).handleStart.bind(loop);
     onStart();
     expect(state(loop).phase).toBe('READY');
@@ -229,5 +253,77 @@ describe('GameLoop – phase transitions', () => {
     state(loop).phaseTimer = 0;
     tickFor(loop, 5.1);
     expect(state(loop).phase).toBe('TITLE');
+  });
+});
+
+describe('GameLoop – story parts collection', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it('starts a new game with 0 parts collected', () => {
+    const { loop } = makeGameLoop();
+    expect(state(loop).partsCollected).toBe(0);
+  });
+
+  it('collects 1 part when a stage is cleared (all enemies defeated)', () => {
+    const { loop, ghosts } = makeGameLoop();
+    state(loop).phase = 'PLAYING';
+    state(loop).partsCollected = 0;
+
+    for (const g of ghosts.ghosts) g.mode = 'VANISHED';
+    tickFor(loop, 1 / 60); // one frame triggers the clear check
+
+    expect(state(loop).phase).toBe('STAGE_CLEAR');
+    expect(state(loop).partsCollected).toBe(1);
+  });
+
+  it('collects all parts after clearing every stage', () => {
+    const { loop, ghosts } = makeGameLoop();
+
+    // Clear stage 1, 2, 3 in sequence
+    for (let level = 1; level <= 3; level++) {
+      state(loop).phase = 'PLAYING';
+      state(loop).level = level;
+      for (const g of ghosts.ghosts) g.mode = 'VANISHED';
+      tickFor(loop, 1 / 60); // PLAYING → STAGE_CLEAR (+1 part)
+      expect(state(loop).partsCollected).toBe(level);
+      tickFor(loop, 2.1); // STAGE_CLEAR → next level / ALL_CLEAR
+    }
+
+    expect(state(loop).partsCollected).toBe(3);
+    expect(state(loop).phase).toBe('ALL_CLEAR');
+  });
+
+  it('resets parts to 0 when returning to TITLE after the ending', () => {
+    const { loop } = makeGameLoop();
+    state(loop).phase = 'ALL_CLEAR';
+    state(loop).phaseTimer = 0;
+    state(loop).partsCollected = 3;
+    tickFor(loop, 5.1); // ALL_CLEAR → TITLE (createInitialState)
+    expect(state(loop).phase).toBe('TITLE');
+    expect(state(loop).partsCollected).toBe(0);
+  });
+
+  it('resets parts to 0 when restarting after GAME_OVER', () => {
+    const { loop } = makeGameLoop();
+    state(loop).phase = 'GAME_OVER';
+    state(loop).gameoverCanInput = true;
+    state(loop).partsCollected = 2;
+    const onStart = (loop as unknown as { handleStart: () => void }).handleStart.bind(loop);
+    onStart(); // GAME_OVER → TITLE (createInitialState)
+    expect(state(loop).partsCollected).toBe(0);
+  });
+
+  it('starts the opening with 0 parts after restarting from GAME_OVER then starting again', () => {
+    const { loop } = makeGameLoop();
+    state(loop).phase = 'GAME_OVER';
+    state(loop).gameoverCanInput = true;
+    state(loop).partsCollected = 3;
+    const onStart = (loop as unknown as { handleStart: () => void }).handleStart.bind(loop);
+    onStart(); // → TITLE
+    onStart(); // TITLE → INTRO
+    expect(state(loop).phase).toBe('INTRO');
+    expect(state(loop).partsCollected).toBe(0);
   });
 });

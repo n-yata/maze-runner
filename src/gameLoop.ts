@@ -14,6 +14,7 @@ import type { StorageManager } from './storage.js';
 const FIXED_TIMESTEP = 1 / 60;
 const MAX_ACCUMULATED = 0.2;
 
+const INTRO_DURATION       = 7.0;
 const READY_DURATION       = 3.0;
 const DEAD_DURATION        = 1.5;
 const CLEAR_DURATION       = 2.0;
@@ -53,6 +54,7 @@ export class GameLoop {
       highScore: this.storage.getHighScore(),
       lives: INITIAL_LIVES,
       level: 1,
+      partsCollected: 0,
       dotsEaten: 0,
       modeTimer: 0,
       modeIndex: 0,
@@ -65,6 +67,10 @@ export class GameLoop {
     this.audio.resume();
     switch (this.state.phase) {
       case 'TITLE':
+        this.startIntro();
+        break;
+      case 'INTRO':
+        // オープニングは入力でスキップしてステージ1へ
         this.startNewGame();
         break;
       case 'ALL_CLEAR':
@@ -86,6 +92,11 @@ export class GameLoop {
     } else if (this.state.phase === 'PAUSED') {
       this.state.phase = 'PLAYING';
     }
+  }
+
+  private startIntro(): void {
+    // 遭難の導入演出。スコア・残機を初期化し、フェーズだけ INTRO に差し替える（盤面は出さない）
+    this.state = { ...this.createInitialState(), phase: 'INTRO' };
   }
 
   private startNewGame(): void {
@@ -163,6 +174,13 @@ export class GameLoop {
     switch (this.state.phase) {
       case 'TITLE':
         this.state.phaseTimer += dt; // タイトル演出（ロゴ登場・飛行士浮遊）の駆動
+        break;
+
+      case 'INTRO':
+        this.state.phaseTimer += dt;
+        if (this.state.phaseTimer >= INTRO_DURATION) {
+          this.startNewGame();
+        }
         break;
 
       case 'READY':
@@ -284,6 +302,8 @@ export class GameLoop {
 
     // クリア条件: 敵を全滅させる（通常エサの取得状況は問わない）
     if (this.ghostMgr.allDefeated()) {
+      // ステージクリアで宇宙船の部品を1個回収（PLAYING→STAGE_CLEAR遷移時の1回のみ発火）
+      this.state.partsCollected++;
       this.storage.setHighScore(this.state.score);
       this.state.highScore = this.storage.getHighScore();
       this.state.phase = 'STAGE_CLEAR';
