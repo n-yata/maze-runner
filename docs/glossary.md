@@ -96,7 +96,7 @@
 
 ### 連鎖食べ
 
-**定義**: ゴースト撃破時のスコア体系（連続加点テーブル `GHOST_EAT_SCORES`）。電磁バリア接触およびレーザーによる撃破に適用される。
+**定義**: ゴースト撃破時のスコア体系（連続加点テーブル `GHOST_EAT_SCORES`）。電磁バリアでは**1回のバリアセッション（1回のパワーエサ取得）内で連続撃破するほど** 200→400→800→1600 とエスカレートする。バリアを再取得すると新セッションとなり連鎖は 200 にリセットされる。レーザー撃破は武器として個別加点（連鎖対象外）。
 
 **スコア**:
 | 連鎖数 | 得点 |
@@ -110,7 +110,7 @@
 
 **英語表記**: Eat Chain
 
-**実装箇所**: `src/constants.ts`（`GHOST_EAT_SCORES`）、`src/ghost.ts`（`GhostState.eatenScore`）
+**実装箇所**: `src/constants.ts`（`GHOST_EAT_SCORES`）、`src/player.ts`（`PlayerState.barrierKillCount` / `registerBarrierKill`）、`src/ghost.ts`（`handleCollision` のバリア撃破分岐）
 
 ---
 

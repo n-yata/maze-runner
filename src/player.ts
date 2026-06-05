@@ -44,6 +44,7 @@ export class PlayerManager {
       animFrame: 0,
       isDead: false,
       barrierTimer: 0,
+      barrierKillCount: 0,
     };
   }
 
@@ -64,14 +65,26 @@ export class PlayerManager {
     }
   }
 
-  /** 電磁バリアを付与する（パワーエサ取得時）。再取得でタイマーを上書き延長する。 */
+  /**
+   * 電磁バリアを付与する（パワーエサ取得時）。再取得でタイマーを上書き延長し、
+   * 連続加点用の撃破カウントを新セッションとして 0 にリセットする。
+   */
   activateBarrier(duration: number): void {
     this.state.barrierTimer = duration;
+    this.state.barrierKillCount = 0;
   }
 
   /** 電磁バリアが展開中か。 */
   hasBarrier(): boolean {
     return this.state.barrierTimer > 0;
+  }
+
+  /**
+   * バリア撃破を1件登録し、その撃破が現セッションで何体目か（0始まりのインデックス）を返す。
+   * 呼び出し側はこのインデックスで連続加点テーブル(GHOST_EAT_SCORES)を引く。
+   */
+  registerBarrierKill(): number {
+    return this.state.barrierKillCount++;
   }
 
   /** バリア残量が点滅しきい値を下回っているか（終了間際の点滅表示用）。 */

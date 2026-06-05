@@ -156,9 +156,10 @@ export class GhostManager {
         if (g.mode === 'VANISHED') return;
         // 電磁バリア展開中は接触で敵を撃破。非展開中は従来どおりプレイヤーがミス。
         if (player.hasBarrier()) {
-          const eatIdx = Math.min(g.eatenScore, GHOST_EAT_SCORES.length - 1);
+          // 連続加点はバリアセッション単位（1回のパワーエサ取得中の撃破数）でエスカレートする
+          const killIdx = player.registerBarrierKill();
+          const eatIdx = Math.min(killIdx, GHOST_EAT_SCORES.length - 1);
           scoreGained += GHOST_EAT_SCORES[eatIdx] ?? 200;
-          g.eatenScore++;
           g.mode = 'VANISHED'; // その場で即消滅（目玉移動なし）
           onDefeat?.({ x: g.pixelPos.x, y: g.pixelPos.y }); // 撃破スパークは敵の位置で
           audio.play('EAT_GHOST');

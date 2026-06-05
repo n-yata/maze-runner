@@ -208,9 +208,61 @@ describe('GhostManager', () => {
 
       const score = mgr.update(1 / 60, map, player, audio, 0);
 
-      // Should score exactly 200 (first defeat), not 400 (double-counted)
+      // Should score exactly 200 (first defeat), not 400 (double-counted by pre+post check)
       expect(score).toBe(200);
-      expect(blinky.eatenScore).toBe(1);
+      // Only one kill registered in the barrier session
+      expect(player.state.barrierKillCount).toBe(1);
+    });
+
+    it('barrier defeats escalate the consecutive score (200/400/800/1600) within one session', () => {
+      const { map, player, audio } = makeDeps();
+      player.activateBarrier(10.0);
+
+      const playerPx = player.getPixelPos();
+      const order = ['BLINKY', 'PINKY', 'INKY', 'CLYDE'] as const;
+      const expected = [200, 400, 800, 1600];
+
+      order.forEach((name, i) => {
+        // Move every other ghost far away so only the targeted one collides this frame
+        for (const g of mgr.ghosts) {
+          if (g.name !== name) {
+            (g as any).pixelPos = { x: -1000, y: -1000 };
+          }
+        }
+        const target = mgr.ghosts.find(g => g.name === name)!;
+        (target as any).pixelPos = { x: playerPx.x, y: playerPx.y };
+        (target as any).pos = { x: Math.floor(playerPx.x / TILE_SIZE), y: Math.floor(playerPx.y / TILE_SIZE) };
+        target.mode = 'CHASE';
+
+        const score = mgr.update(1 / 60, map, player, audio, 0);
+        expect(score).toBe(expected[i]);
+        expect(player.state.isDead).toBe(false);
+      });
+    });
+
+    it('re-activating the barrier resets the consecutive score back to 200', () => {
+      const { map, player, audio } = makeDeps();
+      const playerPx = player.getPixelPos();
+
+      const defeatOne = (name: 'BLINKY' | 'PINKY'): number => {
+        for (const g of mgr.ghosts) {
+          if (g.name !== name) (g as any).pixelPos = { x: -1000, y: -1000 };
+        }
+        const target = mgr.ghosts.find(g => g.name === name)!;
+        (target as any).pixelPos = { x: playerPx.x, y: playerPx.y };
+        (target as any).pos = { x: Math.floor(playerPx.x / TILE_SIZE), y: Math.floor(playerPx.y / TILE_SIZE) };
+        target.mode = 'CHASE';
+        return mgr.update(1 / 60, map, player, audio, 0);
+      };
+
+      player.activateBarrier(10.0);
+      expect(defeatOne('BLINKY')).toBe(200);
+      // Second defeat in the same session escalates to 400
+      expect(defeatOne('PINKY')).toBe(400);
+
+      // Re-eating a power dot starts a fresh session → back to 200
+      player.activateBarrier(10.0);
+      expect(defeatOne('INKY')).toBe(200);
     });
 
     it('VANISHED ghost does not trigger collision when overlapping player', () => {

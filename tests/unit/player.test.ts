@@ -126,5 +126,31 @@ describe('PlayerManager', () => {
       expect(player.hasBarrier()).toBe(false);
       expect(player.state.barrierTimer).toBe(0);
     });
+
+    it('registerBarrierKill returns a 0-based incrementing index', () => {
+      player.activateBarrier(6.0);
+      expect(player.registerBarrierKill()).toBe(0);
+      expect(player.registerBarrierKill()).toBe(1);
+      expect(player.registerBarrierKill()).toBe(2);
+      expect(player.state.barrierKillCount).toBe(3);
+    });
+
+    it('activateBarrier resets the kill count for a fresh session', () => {
+      player.activateBarrier(6.0);
+      player.registerBarrierKill();
+      player.registerBarrierKill();
+      expect(player.state.barrierKillCount).toBe(2);
+
+      player.activateBarrier(6.0); // re-eat power dot → new session
+      expect(player.state.barrierKillCount).toBe(0);
+      expect(player.registerBarrierKill()).toBe(0);
+    });
+
+    it('reset clears the kill count', () => {
+      player.activateBarrier(6.0);
+      player.registerBarrierKill();
+      player.reset();
+      expect(player.state.barrierKillCount).toBe(0);
+    });
   });
 });

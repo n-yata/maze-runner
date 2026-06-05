@@ -33,6 +33,7 @@ export interface PlayerState {
   animFrame: number;
   isDead: boolean;
   barrierTimer: number; // 電磁バリアの残り時間(秒)。0 = 非展開
+  barrierKillCount: number; // 現在のバリアセッションでの撃破数(連続加点用)。展開ごとに0リセット
 }
 
 export interface GhostState {

@@ -22,6 +22,18 @@
 
 - [x] T11: `npm test`(150 passed) / `npm run typecheck` / `npm run lint` 全てパス。
 
+## 追加対応: 連続加点の本来化（B案, 2026-06-06）
+
+シャビ承認のもと、撃破スコアを「各敵200固定」から「バリアセッション単位の連続加点」へ変更。
+
+- [x] B1: `src/types.ts` / `src/player.ts` — `PlayerState.barrierKillCount` 追加。`activateBarrier` で 0 リセット、`registerBarrierKill()`（0始まりインデックスを返す）を追加。
+- [x] B2: `src/ghost.ts` — バリア撃破時に `player.registerBarrierKill()` のインデックスで `GHOST_EAT_SCORES` を引くよう変更（per-ghost `eatenScore` 依存を解消）。
+- [x] B3: テスト追加 — `player.test.ts`（カウントの増加・セッションリセット）、`ghost.test.ts`（200→400→800→1600 のエスカレート、再取得で200リセット）。
+- [x] B4: ドキュメント更新 — `glossary.md` / `product-requirements.md` の連鎖加点記述をバリアセッション単位の実挙動へ。
+- [x] B5: `npm test`(155 passed) / `npm run typecheck` 全パス。
+
+仕様確定: バリア中の再取得は新セッション扱いで連鎖を200にリセット（オリジナル準拠）。レーザー撃破は武器として個別加点のまま（連鎖対象外）。
+
 ## 申し送り事項
 
 **実装完了日**: 2026-06-06
@@ -36,6 +48,6 @@
 - `docs/functional-design.md` は reskin 前の原設計（旧パレット・EATEN/HOUSE/LEAVING モード・frame ベースのタイマー定義）が広範に残存。本機能で直接矛盾する箇所のみ更新し、深い型/シーケンス節の整理は本タスク範囲外として残置。
 
 **次回への改善提案**:
-- 真の連続加点（撃破ごとに 200→400→800→1600 へエスカレート）を望む場合は、バリアセッション単位の撃破カウンタを導入する（旧 `ghostsEatenInFrightened` の役割を `barrier` 文脈で復活させる形）。
+- ~~真の連続加点（撃破ごとに 200→400→800→1600 へエスカレート）を望む場合は、バリアセッション単位の撃破カウンタを導入する~~ → **B案として 2026-06-06 に実装済み**（上記「追加対応」参照）。
 - `docs/functional-design.md` の原設計乖離を別タスクで一括リコンサイルする。
 - `GameState.modeTimer` / `modeIndex` も未使用フィールド（GhostManager 内で別管理）。別タスクでクリーンアップ余地あり。
