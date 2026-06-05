@@ -2,6 +2,7 @@ import type { GameState, GhostState, Direction } from './types.js';
 import {
   TILE_SIZE, CANVAS_WIDTH, CANVAS_HEIGHT,
   COLORS, GHOST_COLORS, getFruitDef, TOTAL_PARTS,
+  ENDING_REPAIR_DONE_TIME, ENDING_LIFTOFF_TIME, ENDING_DURATION,
 } from './constants.js';
 import type { MapManager } from './map.js';
 import type { PlayerManager } from './player.js';
@@ -609,8 +610,8 @@ export class Renderer {
     const cy = CANVAS_HEIGHT / 2;
     this.drawPanel(cy, 120);
 
-    // 段階A(0-2.0s): 回収完了 → 修理開始
-    if (timer < 2.0) {
+    // 段階A(0〜ENDING_REPAIR_DONE_TIME): 回収完了 → 修理開始
+    if (timer < ENDING_REPAIR_DONE_TIME) {
       const k = Math.min(1, timer / 0.4);
       this.glowText('全部品 回収完了', cx, cy - 40, `bold ${TILE_SIZE + 4}px monospace`, '#7DF0FF', 14, 'center', k);
       this.glowText(`◇ ${parts}/${TOTAL_PARTS} ◇`, cx, cy - 6, `${TILE_SIZE}px monospace`, COLORS.POWER_DOT, 8, 'center', k);
@@ -618,17 +619,17 @@ export class Renderer {
       return;
     }
 
-    // 段階B(2.0-3.5s): システム復旧（グロー脈動）
-    if (timer < 3.5) {
-      const pulse = 0.6 + 0.4 * Math.sin((timer - 2.0) * 6);
+    // 段階B(ENDING_REPAIR_DONE_TIME〜ENDING_LIFTOFF_TIME): システム復旧（グロー脈動）
+    if (timer < ENDING_LIFTOFF_TIME) {
+      const pulse = 0.6 + 0.4 * Math.sin((timer - ENDING_REPAIR_DONE_TIME) * 6);
       this.glowText('修理 完了', cx, cy - 34, `bold ${TILE_SIZE + 4}px monospace`, '#46F0D8', 16, 'center', 1);
       this.glowText('システム オールグリーン', cx, cy + 6, `${TILE_SIZE - 5}px monospace`, '#2BE0A8', 8, 'center', pulse);
       this.drawRocket(cx, cy + 56, 0); // 発進前の機体
       return;
     }
 
-    // 段階C(3.5-5.0s): 発進
-    const lift = (timer - 3.5) / 1.5; // 0→1
+    // 段階C(ENDING_LIFTOFF_TIME〜ENDING_DURATION): 発進
+    const lift = (timer - ENDING_LIFTOFF_TIME) / (ENDING_DURATION - ENDING_LIFTOFF_TIME); // 0→1
     const rocketY = cy + 56 - lift * (cy + 120); // 画面上方へ上昇
     this.drawRocket(cx, rocketY, lift);
     this.glowText('発進！', cx, cy - 30, `bold ${TILE_SIZE * 2}px monospace`, '#7DF0FF', 18, 'center', Math.min(1, lift * 2));

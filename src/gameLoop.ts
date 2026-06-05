@@ -1,5 +1,5 @@
 import type { GameState } from './types.js';
-import { INITIAL_LIVES, MAX_LEVEL, getLevelParams, COLORS, getFruitDef } from './constants.js';
+import { INITIAL_LIVES, MAX_LEVEL, getLevelParams, COLORS, getFruitDef, ENDING_DURATION } from './constants.js';
 import { ParticleSystem } from './particles.js';
 import { LaserManager } from './laser.js';
 import type { MapManager } from './map.js';
@@ -18,7 +18,7 @@ const INTRO_DURATION       = 7.0;
 const READY_DURATION       = 3.0;
 const DEAD_DURATION        = 1.5;
 const CLEAR_DURATION       = 2.0;
-const ALL_CLEAR_DURATION   = 5.0;
+const ALL_CLEAR_DURATION   = ENDING_DURATION; // renderer の drawEnding と段階境界を共有
 const GAMEOVER_INPUT_DELAY = 3.0;
 
 export class GameLoop {

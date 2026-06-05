@@ -97,6 +97,12 @@ export const MAX_LEVEL = 3;
 // 宇宙船の部品総数。各ステージのクリアで1個ずつ回収し、全部揃うと修理して脱出する
 export const TOTAL_PARTS = MAX_LEVEL;
 
+// エンディング(ALL_CLEAR)演出の段階境界(秒)。gameLoop のフェーズ継続時間と
+// renderer の描画段階で共有し、両者がズレて演出が途中で切れるのを防ぐ。
+export const ENDING_REPAIR_DONE_TIME = 2.0; // 段階A(回収完了→修理中)の終了
+export const ENDING_LIFTOFF_TIME     = 3.5; // 段階B(修理完了)の終了＝発進開始
+export const ENDING_DURATION         = 5.0; // エンディング全体の長さ(=ALL_CLEAR継続時間)
+
 export const TUNNEL_COLS = [0, COLS - 1]; // x-column indices that are tunnels
 
 export type { GhostMode };
