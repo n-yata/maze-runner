@@ -8,8 +8,6 @@ import {
   GHOST_HOUSE_COLS,
   GHOST_RELEASE_DOT_THRESHOLDS,
   GHOST_SPEED,
-  FRIGHTENED_SPEED,
-  FRIGHTENED_DURATION,
   MODE_SCHEDULE,
   GHOST_EAT_SCORES,
   type LevelParams,
@@ -68,8 +66,6 @@ export class GhostManager {
   private released: Set<GhostName>;
   private inHouse: Set<GhostName>;
   private ghostSpeed = GHOST_SPEED;
-  private frightenedSpd = FRIGHTENED_SPEED;
-  private frightenedDur = FRIGHTENED_DURATION;
   private releaseThresholds: Record<GhostName, number> = { ...GHOST_RELEASE_DOT_THRESHOLDS };
   private modeSchedule: number[] = [...MODE_SCHEDULE];
 
@@ -87,8 +83,6 @@ export class GhostManager {
       pixelPos: { x: centerPx(pos.x), y: centerPx(pos.y) },
       dir: 'LEFT',
       mode: 'SCATTER',
-      prevMode: 'SCATTER',
-      frightenedTimer: 0,
       eatenScore: 0,
       lastTurnTile: { x: -1, y: -1 },
     };
@@ -97,8 +91,6 @@ export class GhostManager {
   reset(params?: LevelParams): void {
     if (params) {
       this.ghostSpeed = params.ghostSpeed;
-      this.frightenedSpd = params.frightenedSpeed;
-      this.frightenedDur = params.frightenedDuration;
       this.releaseThresholds = { ...params.ghostReleaseThresholds };
       this.modeSchedule = [...params.modeSchedule];
     }
@@ -107,16 +99,6 @@ export class GhostManager {
     this.modeIndex = 0;
     this.released = new Set(['BLINKY', 'PINKY']);
     this.inHouse = new Set(['INKY', 'CLYDE']);
-  }
-
-  triggerFrightened(): void {
-    for (const g of this.ghosts) {
-      if (g.mode !== 'VANISHED') {
-        g.prevMode = g.mode;
-        g.mode = 'FRIGHTENED';
-        g.frightenedTimer = this.frightenedDur;
-      }
-    }
   }
 
   update(
@@ -160,14 +142,6 @@ export class GhostManager {
       // 消滅した敵は移動・衝突・描画の対象外（そのステージ中は復活しない）
       if (g.mode === 'VANISHED') continue;
 
-      // Update frightened timer
-      if (g.mode === 'FRIGHTENED') {
-        g.frightenedTimer -= dt;
-        if (g.frightenedTimer <= 0) {
-          g.mode = g.prevMode;
-        }
-      }
-
       const checkCollision = (): boolean => {
         const playerPx = player.getPixelPos();
         const cdx = g.pixelPos.x - playerPx.x;
@@ -177,10 +151,11 @@ export class GhostManager {
       };
 
       const handleCollision = (): void => {
-        // 既に撃破済み（VANISHED）の敵は無害。移動前チェックで食べた直後、
+        // 既に撃破済み（VANISHED）の敵は無害。移動前チェックで撃破した直後、
         // 移動後チェックで同じ敵に再ヒットしてプレイヤーが死ぬ誤判定を防ぐ。
         if (g.mode === 'VANISHED') return;
-        if (g.mode === 'FRIGHTENED') {
+        // 電磁バリア展開中は接触で敵を撃破。非展開中は従来どおりプレイヤーがミス。
+        if (player.hasBarrier()) {
           const eatIdx = Math.min(g.eatenScore, GHOST_EAT_SCORES.length - 1);
           scoreGained += GHOST_EAT_SCORES[eatIdx] ?? 200;
           g.eatenScore++;
@@ -216,8 +191,7 @@ export class GhostManager {
     player: PlayerManager,
     blinky: GhostState,
   ): void {
-    const speed = g.mode === 'FRIGHTENED' ? this.frightenedSpd : this.ghostSpeed;
-    const dist = speed * TILE_SIZE * dt;
+    const dist = this.ghostSpeed * TILE_SIZE * dt;
 
     const col = tileOf(g.pixelPos.x);
     const row = tileOf(g.pixelPos.y);
@@ -260,15 +234,6 @@ export class GhostManager {
   ): Direction {
     const target = this.getTarget(g, map, player, blinky);
     const opp = opposite(g.dir);
-
-    if (g.mode === 'FRIGHTENED') {
-      // Random direction, no reversals
-      const valid = DIRS.filter(({ dir, dx, dy }) =>
-        dir !== opp && !map.isWall(col + dx, row + dy)
-      );
-      if (valid.length === 0) return opp;
-      return valid[Math.floor(Math.random() * valid.length)]!.dir;
-    }
 
     // Choose direction minimizing distance to target (no reversals)
     let bestDir: Direction = g.dir;
@@ -351,10 +316,6 @@ export class GhostManager {
         return GHOST_SCATTER_TARGETS['CLYDE'];
       }
     }
-  }
-
-  getFrightenedEndWarning(): boolean {
-    return this.ghosts.some(g => g.mode === 'FRIGHTENED' && g.frightenedTimer < 2);
   }
 
   /**

@@ -71,7 +71,7 @@ export class Renderer {
         map.drawTo(ctx, MAP_OFFSET_Y);
         map.drawDots(ctx, MAP_OFFSET_Y);
         this.drawFruit(fruitMgr);
-        this.drawGhosts(ghostMgr, false);
+        this.drawGhosts(ghostMgr);
         this.drawPlayer(player);
         this.drawReady(state.phaseTimer);
         break;
@@ -80,7 +80,7 @@ export class Renderer {
         map.drawTo(ctx, MAP_OFFSET_Y);
         map.drawDots(ctx, MAP_OFFSET_Y);
         this.drawFruit(fruitMgr);
-        this.drawGhosts(ghostMgr, ghostMgr.getFrightenedEndWarning());
+        this.drawGhosts(ghostMgr);
         this.drawPlayer(player);
         if (laser) this.drawLaser(laser);
         break;
@@ -89,7 +89,7 @@ export class Renderer {
         map.drawTo(ctx, MAP_OFFSET_Y);
         map.drawDots(ctx, MAP_OFFSET_Y);
         this.drawFruit(fruitMgr);
-        this.drawGhosts(ghostMgr, false);
+        this.drawGhosts(ghostMgr);
         this.drawPlayer(player);
         this.drawPaused();
         break;
@@ -268,9 +268,39 @@ export class Renderer {
     const py = player.state.pixelPos.y + MAP_OFFSET_Y;
     const radius = TILE_SIZE / 2 + 1;
 
+    // 電磁バリア（パワーエサ取得中）。終了間際はリングを点滅させて残量を知らせる。
+    if (player.hasBarrier()) {
+      const hidden = player.isBarrierBlinking() && (Math.floor(Date.now() / 120) % 2 === 0);
+      if (!hidden) {
+        this.drawBarrierRing(px, py, TILE_SIZE * 0.85);
+      }
+    }
+
     ctx.save();
     ctx.translate(px, py);
     this.drawAstronautBody(radius, player.state.dir, player.state.animFrame);
+    ctx.restore();
+  }
+
+  /** 電磁バリアのグローリングを描く。 */
+  private drawBarrierRing(cx: number, cy: number, radius: number): void {
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.strokeStyle = COLORS.BARRIER;
+    ctx.shadowColor = COLORS.BARRIER;
+    ctx.shadowBlur = 12;
+    // 外周リング（やや太め）
+    ctx.lineWidth = 2.5;
+    ctx.globalAlpha = 0.9;
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+    ctx.stroke();
+    // 内側のソフトな発光リング
+    ctx.lineWidth = 1;
+    ctx.globalAlpha = 0.4;
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius * 0.82, 0, Math.PI * 2);
+    ctx.stroke();
     ctx.restore();
   }
 
@@ -322,13 +352,13 @@ export class Renderer {
     }
   }
 
-  private drawGhosts(ghostMgr: GhostManager, frightenedEnding: boolean): void {
+  private drawGhosts(ghostMgr: GhostManager): void {
     for (const g of ghostMgr.ghosts) {
-      this.drawGhost(g, frightenedEnding);
+      this.drawGhost(g);
     }
   }
 
-  private drawGhost(g: GhostState, frightenedEnding: boolean): void {
+  private drawGhost(g: GhostState): void {
     const ctx = this.ctx;
     const px = g.pixelPos.x;
     const py = g.pixelPos.y + MAP_OFFSET_Y;
@@ -336,14 +366,7 @@ export class Renderer {
 
     if (g.mode === 'VANISHED') return; // 消滅した敵は描画しない
 
-    const frightened = g.mode === 'FRIGHTENED';
-    let bodyColor: string;
-    if (frightened) {
-      const flash = frightenedEnding && (Math.floor(Date.now() / 250) % 2 === 0);
-      bodyColor = flash ? COLORS.GHOST_FRIGHTENED_END : COLORS.GHOST_FRIGHTENED;
-    } else {
-      bodyColor = GHOST_COLORS[g.name];
-    }
+    const bodyColor = GHOST_COLORS[g.name];
 
     // 触角（2本、先端に発光球）— stroke 設定を後続描画に漏らさないよう save/restore で閉じ込める
     ctx.save();
@@ -376,24 +399,15 @@ export class Renderer {
     ctx.closePath();
     ctx.fill();
 
-    if (!frightened) {
-      // 大きなエイリアンの目（1つ）＋瞳
-      ctx.fillStyle = '#FFFFFF';
-      ctx.beginPath();
-      ctx.arc(px, py - r * 0.05, r * 0.5, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = '#0A0A1A';
-      ctx.beginPath();
-      ctx.arc(px, py - r * 0.05, r * 0.24, 0, Math.PI * 2);
-      ctx.fill();
-    } else {
-      // イジケ顔
-      ctx.fillStyle = '#FFFFFF';
-      ctx.beginPath();
-      ctx.arc(px - r * 0.3, py - r * 0.1, 2, 0, Math.PI * 2);
-      ctx.arc(px + r * 0.3, py - r * 0.1, 2, 0, Math.PI * 2);
-      ctx.fill();
-    }
+    // 大きなエイリアンの目（1つ）＋瞳
+    ctx.fillStyle = '#FFFFFF';
+    ctx.beginPath();
+    ctx.arc(px, py - r * 0.05, r * 0.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#0A0A1A';
+    ctx.beginPath();
+    ctx.arc(px, py - r * 0.05, r * 0.24, 0, Math.PI * 2);
+    ctx.fill();
   }
 
   private drawFruit(fruitMgr: FruitManager): void {

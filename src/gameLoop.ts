@@ -56,7 +56,6 @@ export class GameLoop {
       dotsEaten: 0,
       modeTimer: 0,
       modeIndex: 0,
-      ghostsEatenInFrightened: 0,
       phaseTimer: 0,
       gameoverCanInput: false,
     };
@@ -242,7 +241,8 @@ export class GameLoop {
     this.state.dotsEaten = this.map.getTotalDots() - this.map.getRemainingDots();
 
     if (this.didEatPowerDot()) {
-      this.ghostMgr.triggerFrightened();
+      // パワーエサ取得でプレイヤーに電磁バリアを付与（再取得でタイマー上書き延長）
+      this.player.activateBarrier(getLevelParams(this.state.level).barrierDuration);
     }
 
     const ghostScore = this.ghostMgr.update(

@@ -9,7 +9,7 @@ export type TileType =
 
 export type Direction = 'UP' | 'DOWN' | 'LEFT' | 'RIGHT' | 'NONE';
 
-export type GhostMode = 'SCATTER' | 'CHASE' | 'FRIGHTENED' | 'VANISHED';
+export type GhostMode = 'SCATTER' | 'CHASE' | 'VANISHED';
 
 export type GhostName = 'BLINKY' | 'PINKY' | 'INKY' | 'CLYDE';
 
@@ -32,6 +32,7 @@ export interface PlayerState {
   nextDir: Direction;
   animFrame: number;
   isDead: boolean;
+  barrierTimer: number; // 電磁バリアの残り時間(秒)。0 = 非展開
 }
 
 export interface GhostState {
@@ -40,8 +41,6 @@ export interface GhostState {
   pixelPos: Vec2;
   dir: Direction;
   mode: GhostMode;
-  prevMode: GhostMode;
-  frightenedTimer: number;
   eatenScore: number;
   lastTurnTile: Vec2;
 }
@@ -55,7 +54,6 @@ export interface GameState {
   dotsEaten: number;
   modeTimer: number;
   modeIndex: number;
-  ghostsEatenInFrightened: number;
   phaseTimer: number;
   gameoverCanInput: boolean;
 }

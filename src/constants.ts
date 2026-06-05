@@ -9,9 +9,9 @@ export const CANVAS_HEIGHT = (ROWS + 4) * TILE_SIZE; // extra rows for score UI
 
 export const PLAYER_SPEED = 5.5; // tiles per second
 export const GHOST_SPEED = 4.5;  // プレイヤー(5.5)より少し遅く
-export const FRIGHTENED_SPEED = 3.0;
 
-export const FRIGHTENED_DURATION = 6.0; // seconds
+// 電磁バリアの残量がこの秒数を下回ると点滅警告する
+export const BARRIER_BLINK_THRESHOLD = 2.0; // seconds
 
 export const PLAYER_START: Vec2 = { x: 7, y: 19 };
 
@@ -63,8 +63,7 @@ export const COLORS = {
   POWER_DOT:   '#FFE66D',         // コア
   POWER_DOT_GLOW: 'rgba(255, 230, 109, 0.30)', // コアのグロー（POWER_DOTと同系）
   PLAYER:      '#9FD0FF',         // 宇宙船ハル
-  GHOST_FRIGHTENED:     '#2A2AE0',
-  GHOST_FRIGHTENED_END: '#FFFFFF',
+  BARRIER:     '#5FE6FF',         // 電磁バリア（電磁シアン）
   SCORE_TEXT:  '#FFFFFF',
   LIFE_COLOR:  '#9FD0FF',
   SHIP_THRUSTER: '#FF8A3C',       // 推進炎
@@ -132,8 +131,7 @@ export function getFruitDef(level: number): FruitDef {
 export interface LevelParams {
   playerSpeed: number;
   ghostSpeed: number;
-  frightenedSpeed: number;
-  frightenedDuration: number;
+  barrierDuration: number; // 電磁バリアの持続時間(秒)。レベルで短縮
   ghostReleaseThresholds: Record<GhostName, number>;
   modeSchedule: number[];
 }
@@ -143,8 +141,7 @@ const LEVEL_PARAMS: LevelParams[] = [
   {
     playerSpeed: 5.5,
     ghostSpeed: 4.5,
-    frightenedSpeed: 3.0,
-    frightenedDuration: 6.0,
+    barrierDuration: 6.0,
     ghostReleaseThresholds: { BLINKY: 0, PINKY: 0, INKY: 30, CLYDE: 60 },
     modeSchedule: [7, 20, 7, 20, 5, 20, 5],
   },
@@ -152,8 +149,7 @@ const LEVEL_PARAMS: LevelParams[] = [
   {
     playerSpeed: 5.8,
     ghostSpeed: 5.0,
-    frightenedSpeed: 3.0,
-    frightenedDuration: 5.0,
+    barrierDuration: 5.0,
     ghostReleaseThresholds: { BLINKY: 0, PINKY: 0, INKY: 20, CLYDE: 40 },
     modeSchedule: [7, 20, 7, 20, 5, 20, 5],
   },
@@ -161,8 +157,7 @@ const LEVEL_PARAMS: LevelParams[] = [
   {
     playerSpeed: 6.0,
     ghostSpeed: 5.5,
-    frightenedSpeed: 3.0,
-    frightenedDuration: 4.0,
+    barrierDuration: 4.0,
     ghostReleaseThresholds: { BLINKY: 0, PINKY: 0, INKY: 15, CLYDE: 30 },
     modeSchedule: [7, 20, 7, 20, 5, 20, 5],
   },
@@ -170,8 +165,7 @@ const LEVEL_PARAMS: LevelParams[] = [
   {
     playerSpeed: 6.2,
     ghostSpeed: 5.8,
-    frightenedSpeed: 3.0,
-    frightenedDuration: 3.0,
+    barrierDuration: 3.0,
     ghostReleaseThresholds: { BLINKY: 0, PINKY: 0, INKY: 10, CLYDE: 20 },
     modeSchedule: [7, 20, 5, 20, 5, 20, 5],
   },
@@ -179,8 +173,7 @@ const LEVEL_PARAMS: LevelParams[] = [
   {
     playerSpeed: 6.5,
     ghostSpeed: 6.2,
-    frightenedSpeed: 3.0,
-    frightenedDuration: 2.0,
+    barrierDuration: 2.0,
     ghostReleaseThresholds: { BLINKY: 0, PINKY: 0, INKY: 5, CLYDE: 10 },
     modeSchedule: [5, 20, 5, 20, 5, 20, 5],
   },

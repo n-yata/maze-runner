@@ -1,5 +1,5 @@
 import type { PlayerState, Direction, Vec2 } from './types.js';
-import { TILE_SIZE, PLAYER_START, PLAYER_SPEED, COLS, SCORE } from './constants.js';
+import { TILE_SIZE, PLAYER_START, PLAYER_SPEED, COLS, SCORE, BARRIER_BLINK_THRESHOLD } from './constants.js';
 import type { MapManager } from './map.js';
 import type { AudioManager } from './audio.js';
 
@@ -43,6 +43,7 @@ export class PlayerManager {
       nextDir: 'LEFT',
       animFrame: 0,
       isDead: false,
+      barrierTimer: 0,
     };
   }
 
@@ -63,7 +64,28 @@ export class PlayerManager {
     }
   }
 
+  /** 電磁バリアを付与する（パワーエサ取得時）。再取得でタイマーを上書き延長する。 */
+  activateBarrier(duration: number): void {
+    this.state.barrierTimer = duration;
+  }
+
+  /** 電磁バリアが展開中か。 */
+  hasBarrier(): boolean {
+    return this.state.barrierTimer > 0;
+  }
+
+  /** バリア残量が点滅しきい値を下回っているか（終了間際の点滅表示用）。 */
+  isBarrierBlinking(): boolean {
+    return this.state.barrierTimer > 0 && this.state.barrierTimer < BARRIER_BLINK_THRESHOLD;
+  }
+
   update(dt: number, map: MapManager, audio: AudioManager): void {
+    // バリア残量は isDead 判定より前に減衰させる（移動停止中も時間は進む）。
+    // リスポーン時は reset() が barrierTimer=0 にするため整合は保たれる。
+    if (this.state.barrierTimer > 0) {
+      this.state.barrierTimer = Math.max(0, this.state.barrierTimer - dt);
+    }
+
     if (this.state.isDead) return;
 
     const speed = this.speed * TILE_SIZE; // px/s

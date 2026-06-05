@@ -37,29 +37,9 @@ describe('GhostManager', () => {
     }
   });
 
-  it('triggerFrightened sets all non-EATEN ghosts to FRIGHTENED', () => {
-    mgr.triggerFrightened();
-    for (const ghost of mgr.ghosts) {
-      expect(ghost.mode).toBe('FRIGHTENED');
-    }
-  });
-
-  it('triggerFrightened does not affect VANISHED ghosts', () => {
-    const blinky = mgr.ghosts.find(g => g.name === 'BLINKY')!;
-    blinky.mode = 'VANISHED';
-    mgr.triggerFrightened();
-    expect(blinky.mode).toBe('VANISHED');
-  });
-
-  it('triggerFrightened saves previous mode', () => {
+  it('reset restores all ghosts to initial state', () => {
     const blinky = mgr.ghosts.find(g => g.name === 'BLINKY')!;
     blinky.mode = 'CHASE';
-    mgr.triggerFrightened();
-    expect(blinky.prevMode).toBe('CHASE');
-  });
-
-  it('reset restores all ghosts to initial state', () => {
-    mgr.triggerFrightened();
     mgr.reset();
     for (const ghost of mgr.ghosts) {
       expect(ghost.mode).toBe('SCATTER');
@@ -67,14 +47,6 @@ describe('GhostManager', () => {
       expect(ghost.pos.x).toBe(expected.x);
       expect(ghost.pos.y).toBe(expected.y);
     }
-  });
-
-  it('reset with LevelParams applies frightenedDuration to triggerFrightened', () => {
-    const params = getLevelParams(3); // frightenedDuration: 4.0
-    mgr.reset(params);
-    mgr.triggerFrightened();
-    const blinky = mgr.ghosts.find(g => g.name === 'BLINKY')!;
-    expect(blinky.frightenedTimer).toBeCloseTo(params.frightenedDuration);
   });
 
   it('reset with LevelParams uses updated release thresholds', () => {
@@ -87,24 +59,6 @@ describe('GhostManager', () => {
       mgr.update(1 / 60, map, player, audio, 15);
     }
     expect(inky.mode).toBe('SCATTER');
-  });
-
-  it('getFrightenedEndWarning returns false when no ghosts are frightened', () => {
-    expect(mgr.getFrightenedEndWarning()).toBe(false);
-  });
-
-  it('getFrightenedEndWarning returns true when a ghost has < 2s remaining', () => {
-    const blinky = mgr.ghosts.find(g => g.name === 'BLINKY')!;
-    blinky.mode = 'FRIGHTENED';
-    blinky.frightenedTimer = 1.5;
-    expect(mgr.getFrightenedEndWarning()).toBe(true);
-  });
-
-  it('getFrightenedEndWarning returns false when frightened timer > 2s', () => {
-    const blinky = mgr.ghosts.find(g => g.name === 'BLINKY')!;
-    blinky.mode = 'FRIGHTENED';
-    blinky.frightenedTimer = 4.0;
-    expect(mgr.getFrightenedEndWarning()).toBe(false);
   });
 
   it('Blinky scatter target is top-right area', () => {
@@ -136,18 +90,6 @@ describe('GhostManager', () => {
       const { map, player, audio } = makeDeps();
       const score = mgr.update(1 / 60, map, player, audio, 0);
       expect(score).toBe(0);
-    });
-
-    it('frightened ghosts revert to prev mode after timer expires', () => {
-      const { map, player, audio } = makeDeps();
-      const blinky = mgr.ghosts.find(g => g.name === 'BLINKY')!;
-      blinky.mode = 'FRIGHTENED';
-      blinky.prevMode = 'CHASE';
-      blinky.frightenedTimer = 0.01;
-
-      mgr.update(0.1, map, player, audio, 0); // advance past timer
-
-      expect(blinky.mode).toBe('CHASE');
     });
 
     it('releases Inky after 30 dots eaten', () => {
@@ -202,23 +144,40 @@ describe('GhostManager', () => {
       expect(player.state.isDead).toBe(false);
     });
 
-    it('frightened ghost is eaten when player overlaps within 12px', () => {
+    it('ghost is defeated when player has a barrier and overlaps within 12px', () => {
       const { map, player, audio } = makeDeps();
       const blinky = mgr.ghosts.find(g => g.name === 'BLINKY')!;
 
       const playerPx = player.getPixelPos();
       (blinky as any).pixelPos = { x: playerPx.x + 5, y: playerPx.y };
       (blinky as any).pos = { x: Math.floor((playerPx.x + 5) / TILE_SIZE), y: Math.floor(playerPx.y / TILE_SIZE) };
-      blinky.mode = 'FRIGHTENED';
-      blinky.frightenedTimer = 5.0;
+      blinky.mode = 'CHASE';
+      player.activateBarrier(5.0);
 
       const score = mgr.update(1 / 60, map, player, audio, 0);
 
       expect(blinky.mode).toBe('VANISHED');
       expect(score).toBeGreaterThan(0);
+      expect(player.state.isDead).toBe(false);
     });
 
-    it('eating a frightened ghost never kills the player (pre+post move re-hit)', () => {
+    it('player WITHOUT a barrier dies on contact (no defeat)', () => {
+      const { map, player, audio } = makeDeps();
+      const blinky = mgr.ghosts.find(g => g.name === 'BLINKY')!;
+
+      const playerPx = player.getPixelPos();
+      (blinky as any).pixelPos = { x: playerPx.x + 5, y: playerPx.y };
+      (blinky as any).pos = { x: Math.floor((playerPx.x + 5) / TILE_SIZE), y: Math.floor(playerPx.y / TILE_SIZE) };
+      blinky.mode = 'CHASE'; // no barrier active
+
+      const score = mgr.update(1 / 60, map, player, audio, 0);
+
+      expect(player.state.isDead).toBe(true);
+      expect(blinky.mode).not.toBe('VANISHED');
+      expect(score).toBe(0);
+    });
+
+    it('defeating with a barrier never kills the player (pre+post move re-hit)', () => {
       const { map, player, audio } = makeDeps();
       const blinky = mgr.ghosts.find(g => g.name === 'BLINKY')!;
 
@@ -226,30 +185,30 @@ describe('GhostManager', () => {
       const playerPx = player.getPixelPos();
       (blinky as any).pixelPos = { x: playerPx.x + 2, y: playerPx.y };
       (blinky as any).pos = { x: Math.floor((playerPx.x + 2) / TILE_SIZE), y: Math.floor(playerPx.y / TILE_SIZE) };
-      blinky.mode = 'FRIGHTENED';
-      blinky.frightenedTimer = 5.0;
+      blinky.mode = 'CHASE';
+      player.activateBarrier(5.0);
 
       mgr.update(1 / 60, map, player, audio, 0);
 
-      // Ghost is eaten (VANISHED) and the player must survive — the now-VANISHED
+      // Ghost is defeated (VANISHED) and the player must survive — the now-VANISHED
       // ghost on the same tile must NOT trigger a death on the post-move check.
       expect(blinky.mode).toBe('VANISHED');
       expect(player.state.isDead).toBe(false);
     });
 
-    it('frightened ghost is counted only once per update even with pre+post move checks', () => {
+    it('barrier defeat is counted only once per update even with pre+post move checks', () => {
       const { map, player, audio } = makeDeps();
       const blinky = mgr.ghosts.find(g => g.name === 'BLINKY')!;
 
       const playerPx = player.getPixelPos();
       (blinky as any).pixelPos = { x: playerPx.x + 5, y: playerPx.y };
       (blinky as any).pos = { x: Math.floor((playerPx.x + 5) / TILE_SIZE), y: Math.floor(playerPx.y / TILE_SIZE) };
-      blinky.mode = 'FRIGHTENED';
-      blinky.frightenedTimer = 5.0;
+      blinky.mode = 'CHASE';
+      player.activateBarrier(5.0);
 
       const score = mgr.update(1 / 60, map, player, audio, 0);
 
-      // Should score exactly 200 (first eat), not 400 (double-counted)
+      // Should score exactly 200 (first defeat), not 400 (double-counted)
       expect(score).toBe(200);
       expect(blinky.eatenScore).toBe(1);
     });
@@ -270,15 +229,15 @@ describe('GhostManager', () => {
   });
 
   describe('vanish behavior (defeated ghosts)', () => {
-    it('eating a frightened ghost sets it to VANISHED with consecutive score', () => {
+    it('defeating a ghost with a barrier sets it to VANISHED with consecutive score', () => {
       const { map, player, audio } = makeDeps();
       const blinky = mgr.ghosts.find(g => g.name === 'BLINKY')!;
 
       const playerPx = player.getPixelPos();
       (blinky as any).pixelPos = { x: playerPx.x + 5, y: playerPx.y };
       (blinky as any).pos = { x: Math.floor((playerPx.x + 5) / TILE_SIZE), y: Math.floor(playerPx.y / TILE_SIZE) };
-      blinky.mode = 'FRIGHTENED';
-      blinky.frightenedTimer = 5.0;
+      blinky.mode = 'CHASE';
+      player.activateBarrier(5.0);
 
       const score = mgr.update(1 / 60, map, player, audio, 0);
 

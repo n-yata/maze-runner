@@ -6,7 +6,7 @@ describe('getLevelParams', () => {
     const p = getLevelParams(1);
     expect(p.playerSpeed).toBe(5.5);
     expect(p.ghostSpeed).toBe(4.5);
-    expect(p.frightenedDuration).toBe(6.0);
+    expect(p.barrierDuration).toBe(6.0);
     expect(p.ghostReleaseThresholds.INKY).toBe(30);
     expect(p.ghostReleaseThresholds.CLYDE).toBe(60);
   });
@@ -15,7 +15,7 @@ describe('getLevelParams', () => {
     const p = getLevelParams(2);
     expect(p.playerSpeed).toBe(5.8);
     expect(p.ghostSpeed).toBe(5.0);
-    expect(p.frightenedDuration).toBe(5.0);
+    expect(p.barrierDuration).toBe(5.0);
   });
 
   it('level 6 returns the same params as level 5 (cap)', () => {
@@ -41,9 +41,9 @@ describe('getLevelParams', () => {
     }
   });
 
-  it('frightenedDuration decreases with each level', () => {
+  it('barrierDuration decreases with each level', () => {
     for (let lvl = 1; lvl < 5; lvl++) {
-      expect(getLevelParams(lvl + 1).frightenedDuration).toBeLessThan(getLevelParams(lvl).frightenedDuration);
+      expect(getLevelParams(lvl + 1).barrierDuration).toBeLessThan(getLevelParams(lvl).barrierDuration);
     }
   });
 
