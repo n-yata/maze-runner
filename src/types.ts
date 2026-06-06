@@ -62,6 +62,7 @@ export interface GameState {
   partsCollected: number; // 回収した宇宙船の部品数(0〜MAX_LEVEL)。永続化せず1プレイで完結
   bossHearts: number;     // ボス戦のプレイヤー体力(ハート)。被弾で減り0でゲームオーバー。通常面では未使用
   bossInvuln: number;     // ボス戦の被弾後 無敵残り時間(秒)。連続被弾防止＋点滅表示用
+  bossContinuable: boolean; // ボス戦でゲームオーバーになったか。trueなら GAME_OVER からボス戦を再挑戦できる
   dotsEaten: number;
   modeTimer: number;
   modeIndex: number;

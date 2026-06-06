@@ -103,10 +103,9 @@ function buildTiles(level: number): TileType[] {
 // ボス闘技場のレイアウト。外周のみ壁で内部は開けた広間にする。
 // 迷路を置かない理由: レーザーは壁で消滅するため、上方のボスへ遮蔽なく届く必要がある。
 // シューティング風の遊び: プレイヤーは下部を左右に動いて弾を避けつつ、上方へレーザーで反撃する。
-// 被弾はハート制で管理するためパワーエサ(電磁バリア)は置かない。内部全面ドットは
-// スコア源＋フルーツ(レーザー供給)の有効位置として残す。
+// エサ(ドット/パワーエサ)は一切置かない: レーザーはフルーツなしで常時発射、被弾はハート制で管理する。
 function buildBossArena(): TileType[] {
-  const t: number[] = new Array(COLS * ROWS).fill(2); // 全面ドット（スコア源＋フルーツ有効位置）
+  const t: number[] = new Array(COLS * ROWS).fill(0); // 全面 EMPTY（エサなしの開けた闘技場）
   const idx = (c: number, r: number) => r * COLS + c;
 
   // 外周ボーダーのみ壁

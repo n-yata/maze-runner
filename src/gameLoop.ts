@@ -69,6 +69,7 @@ export class GameLoop {
       partsCollected: 0,
       bossHearts: 0,
       bossInvuln: 0,
+      bossContinuable: false,
       dotsEaten: 0,
       modeTimer: 0,
       modeIndex: 0,
@@ -92,8 +93,13 @@ export class GameLoop {
         break;
       case 'GAME_OVER':
         if (this.state.gameoverCanInput) {
-          this.state = this.createInitialState();
-          this.map.reset(1);
+          if (this.state.bossContinuable) {
+            // ボス戦のゲームオーバーはボス戦から再挑戦(continue)。ハート/ボスHP回復、スコアは維持。
+            this.startBossStage();
+          } else {
+            this.state = this.createInitialState();
+            this.map.reset(1);
+          }
         }
         break;
     }
@@ -374,28 +380,16 @@ export class GameLoop {
    *  体力: ハート制（被弾でハート-1＋無敵時間。0でゲームオーバー）。リスポーンはしない。
    */
   private updateBoss(dt: number): void {
-    // 左右入力のみ受け付ける（上下は無視＝シューティング風の横移動限定）
-    const dir = this.input.consumeDirection();
-    if (dir === 'LEFT' || dir === 'RIGHT') {
-      this.player.setNextDir(dir);
-    }
-
-    this.player.update(dt, this.map, this.audio);
-    this.state.score += this.player.score;
-    this.player.resetScore();
+    // ホールド操作: スライド/キー押下している間だけ左右に動き、離すと止まる（勝手に動かない）。
+    const held = this.input.getHeldDirection();
+    this.player.moveHorizontal(dt, held, this.map);
 
     const ppos = this.player.getPixelPos();
 
-    // フルーツ供給（ボス生存中は出し続けてレーザーが枯れないようにする＝詰み防止）
-    const enemiesRemain = !this.boss.isDefeated;
-    this.fruitMgr.updateSpawning(dt, enemiesRemain, this.state.level, this.map.getValidFruitPositions());
-    const fruitsEaten = this.fruitMgr.update(dt, ppos);
-    if (fruitsEaten > 0) {
-      this.laser.activate();
-      this.audio.play('EAT_FRUIT');
-      this.particles.spawnBurst(ppos.x, ppos.y, getFruitDef(this.state.level).color, 16, 100);
+    // フルーツなしで常時連射（ボス生存中はレーザーを撃ち続ける）。
+    if (!this.boss.isDefeated) {
+      this.laser.keepFiring();
     }
-
     // レーザーは常に上方向へ発射（横移動しながら上のボスを撃つ）。
     // 敵は全員 VANISHED なので defeatAt は空振り。ボスへのダメージは hitByBeams で別途処理。
     this.laser.update(dt, ppos, 'UP', this.map, this.ghostMgr);
@@ -423,7 +417,9 @@ export class GameLoop {
       this.audio.play('DEATH');
       this.particles.spawnBurst(ppos.x, ppos.y, COLORS.SHIP_THRUSTER, 18, 110);
       if (this.state.bossHearts <= 0) {
-        // ハートを使い切ったらゲームオーバー（リスポーンせず終了）
+        // ハートを使い切ったらゲームオーバー（リスポーンせず終了）。
+        // ボス戦由来なので continue 可能フラグを立て、GAME_OVER からボス戦を再挑戦できるようにする。
+        this.state.bossContinuable = true;
         this.storage.setHighScore(this.state.score);
         this.state.highScore = this.storage.getHighScore();
         this.state.phase = 'GAME_OVER';

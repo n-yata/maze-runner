@@ -228,8 +228,8 @@ export const BOSS_PLAYER_HEARTS = 3;   // ボス戦のハート数
 export const BOSS_HIT_INVULN    = 1.2; // 被弾後の無敵時間(秒)。連続被弾防止＋点滅表示
 
 // HP・ダメージ
-export const BOSS_MAX_HP      = 60;            // 初期HP。レーザー1ヒット=1ダメージ → 60ヒットで撃破
-export const BOSS_HIT_DAMAGE  = 1;             // レーザー1ヒットの与ダメ
+export const BOSS_MAX_HP      = 60;            // 初期HP
+export const BOSS_HIT_DAMAGE  = 2;             // レーザー1ヒットの与ダメ（強すぎ調整: 1→2 で体力を早く削れる）
 export const BOSS_BODY_RADIUS = TILE_SIZE * 1.6; // 本体の被弾円半径(px)。大きめで上方の的に当てやすく
 
 // 本体の挙動（盤面上部で左右往復）

@@ -234,17 +234,17 @@ describe('MapManager - ボス闘技場 (resetBossArena)', () => {
     expect(reachable.size).toBe(passable);
   });
 
-  it('パワーエサは配置しない（被弾はハート制で管理しバリアは使わない）', () => {
+  it('エサ(ドット/パワーエサ)を一切配置しない（常時ビーム・ハート制のため）', () => {
+    let dots = 0;
     let power = 0;
     for (let r = 0; r < ROWS; r++) {
       for (let c = 0; c < COLS; c++) {
+        if (map.isDot(c, r)) dots++;
         if (map.isPowerDot(c, r)) power++;
       }
     }
+    expect(dots).toBe(0);
     expect(power).toBe(0);
-  });
-
-  it('フルーツ有効位置が非空（詰み防止の前提）', () => {
-    expect(map.getValidFruitPositions().length).toBeGreaterThan(0);
+    expect(map.getRemainingDots()).toBe(0);
   });
 });

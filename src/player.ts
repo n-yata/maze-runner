@@ -171,6 +171,34 @@ export class PlayerManager {
     }
   }
 
+  /**
+   * ボス戦のシューティング操作。押されている間だけ左右に動き、入力がなければ停止する。
+   * 縦位置は固定（下部の高さを維持）。外周壁の手前で止まる。dot 取得や方向予約は行わない。
+   */
+  moveHorizontal(dt: number, dir: Direction, map: MapManager): void {
+    this.state.animFrame = (this.state.animFrame + dt * 8) % 1;
+
+    if (dir !== 'LEFT' && dir !== 'RIGHT') {
+      return; // 入力なし＝その場で停止（勝手に動かない）
+    }
+    this.state.dir = dir;
+
+    const sign = dir === 'LEFT' ? -1 : 1;
+    const dist = this.speed * TILE_SIZE * dt;
+    const cy = this.state.pixelPos.y;
+    let newX = this.state.pixelPos.x + sign * dist;
+
+    // 進行方向の先端タイルが壁なら、現在タイル中心へスナップして止める（外周で停止）
+    const leadCol = tileOf(newX + sign * (TILE_SIZE / 2 - 1));
+    const row = tileOf(cy);
+    if (map.isWall(leadCol, row)) {
+      newX = centerPx(tileOf(this.state.pixelPos.x));
+    }
+
+    this.state.pixelPos = { x: newX, y: cy };
+    this.state.pos = { x: tileOf(newX), y: row };
+  }
+
   private applyTunnelWarp(ppos: Vec2): Vec2 {
     const totalWidth = COLS * TILE_SIZE;
     let x = ppos.x;

@@ -139,9 +139,8 @@ export class Renderer {
         break;
 
       case 'BOSS_READY':
+        // ボス闘技場はエサなし（開けた広間）。マップ壁のみ描く。
         map.drawTo(ctx, MAP_OFFSET_Y);
-        map.drawDots(ctx, MAP_OFFSET_Y);
-        this.drawFruit(fruitMgr);
         this.drawPlayer(player);
         if (boss) { this.drawBoss(boss); this.drawBossHpBar(boss); }
         this.drawBossHearts(state.bossHearts);
@@ -150,8 +149,6 @@ export class Renderer {
 
       case 'BOSS':
         map.drawTo(ctx, MAP_OFFSET_Y);
-        map.drawDots(ctx, MAP_OFFSET_Y);
-        this.drawFruit(fruitMgr);
         // 被弾後の無敵中はプレイヤーを点滅させる
         if (!(state.bossInvuln > 0 && Math.floor(performance.now() / 100) % 2 === 0)) {
           this.drawPlayer(player);
@@ -179,7 +176,7 @@ export class Renderer {
 
       case 'GAME_OVER':
         map.drawTo(ctx, MAP_OFFSET_Y);
-        this.drawGameOver(state.gameoverCanInput);
+        this.drawGameOver(state.gameoverCanInput, state.bossContinuable);
         break;
     }
 
@@ -1398,12 +1395,18 @@ export class Renderer {
     this.glowText(`部品 ${partsCollected}/${TOTAL_PARTS} 回収`, cx, cy + 36, `${TILE_SIZE - 4}px monospace`, COLORS.POWER_DOT, 8, 'center', k);
   }
 
-  private drawGameOver(canInput: boolean): void {
+  private drawGameOver(canInput: boolean, bossContinuable = false): void {
     const cx = CANVAS_WIDTH / 2;
     const cy = CANVAS_HEIGHT / 2;
-    this.drawPanel(cy, 70);
-    this.glowText('GAME OVER', cx, cy + 2, `bold ${TILE_SIZE * 2}px monospace`, '#FF4D5E', 16);
-    if (canInput) {
+    this.drawPanel(cy, bossContinuable ? 84 : 70);
+    this.glowText('GAME OVER', cx, cy - (bossContinuable ? 8 : -2), `bold ${TILE_SIZE * 2}px monospace`, '#FF4D5E', 16);
+    if (bossContinuable) {
+      // ボス戦からの再挑戦(continue)導線
+      this.glowText('CONTINUE? ボス戦から再開', cx, cy + 30, `${TILE_SIZE - 5}px monospace`, '#FFE08A', 8, 'center');
+      if (canInput) {
+        this.glowText('Press SPACE / Tap', cx, cy + 58, `${TILE_SIZE - 2}px monospace`, '#FFFFFF', 8, 'center', this.pulseAlpha());
+      }
+    } else if (canInput) {
       this.glowText('Press SPACE / Tap', cx, cy + 36, `${TILE_SIZE}px monospace`, '#FFFFFF', 8, 'center', this.pulseAlpha());
     }
   }

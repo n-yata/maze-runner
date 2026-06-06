@@ -153,4 +153,43 @@ describe('PlayerManager', () => {
       expect(player.state.barrierKillCount).toBe(0);
     });
   });
+
+  describe('moveHorizontal (boss shooting controls)', () => {
+    let bossMap: MapManager;
+    beforeEach(() => {
+      bossMap = new MapManager();
+      bossMap.resetBossArena();
+    });
+
+    it('moves right while RIGHT is held', () => {
+      const x0 = player.state.pixelPos.x;
+      player.moveHorizontal(0.1, 'RIGHT', bossMap);
+      expect(player.state.pixelPos.x).toBeGreaterThan(x0);
+    });
+
+    it('moves left while LEFT is held', () => {
+      const x0 = player.state.pixelPos.x;
+      player.moveHorizontal(0.1, 'LEFT', bossMap);
+      expect(player.state.pixelPos.x).toBeLessThan(x0);
+    });
+
+    it('does not move when no direction is held (stops in place)', () => {
+      const x0 = player.state.pixelPos.x;
+      player.moveHorizontal(0.1, 'NONE', bossMap);
+      expect(player.state.pixelPos.x).toBe(x0);
+    });
+
+    it('ignores vertical input and keeps a fixed row', () => {
+      const y0 = player.state.pixelPos.y;
+      player.moveHorizontal(0.1, 'UP', bossMap);   // 縦入力では動かない
+      player.moveHorizontal(0.1, 'RIGHT', bossMap); // 横移動してもYは固定
+      expect(player.state.pixelPos.y).toBe(y0);
+    });
+
+    it('stops at the arena wall instead of passing through', () => {
+      for (let i = 0; i < 200; i++) player.moveHorizontal(1 / 60, 'LEFT', bossMap);
+      expect(bossMap.isWall(player.state.pos.x, player.state.pos.y)).toBe(false);
+      expect(player.state.pos.x).toBeGreaterThanOrEqual(1); // 外周壁(col0)に入らない
+    });
+  });
 });

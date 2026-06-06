@@ -58,6 +58,14 @@ export class LaserManager {
     this.fireTimer = 0; // 取得直後に1発撃てるようにする
   }
 
+  /**
+   * フルーツなしで連射し続けたい場面（ボス戦）で毎フレーム呼ぶ。
+   * モード残時間だけを維持し、発射間隔(fireTimer)には触れないため連射ペースは一定に保たれる。
+   */
+  keepFiring(): void {
+    this.modeTimer = LASER_DURATION;
+  }
+
   /** ステージ開始・プレイヤー死亡時のリセット。 */
   reset(): void {
     this.modeTimer = 0;

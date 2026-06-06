@@ -455,15 +455,32 @@ describe('GameLoop – boss stage', () => {
     expect(state(loop).phase).toBe('BOSS_DEFEATED');
   });
 
-  it('does NOT clear the boss stage while HP remains (no early clear)', () => {
+  it('does NOT clear the boss stage while HP remains (clears only at HP 0)', () => {
     const { loop } = makeGameLoop();
-    state(loop).phase = 'BOSS';
-    state(loop).bossHearts = BOSS_PLAYER_HEARTS;
+    enterBossPhase(loop);
     state(loop).bossInvuln = 999; // 被弾でゲームオーバーにならないよう無敵に
-    damageBoss(loop, BOSS_MAX_HP - 1); // HPを1だけ残す
-    tickFor(loop, 0.5);
+    tickFor(loop, 0.3); // 常時ビームで多少削れるが0.3秒では撃破に至らない
     expect(boss(loop).hp).toBeGreaterThan(0);
-    expect(state(loop).phase).not.toBe('BOSS_DEFEATED');
+    expect(state(loop).phase).toBe('BOSS');
+  });
+
+  it('GAME_OVER in the boss stage can continue back into the boss fight', () => {
+    const { loop, player } = makeGameLoop();
+    enterBossPhase(loop);
+    state(loop).bossHearts = 1; // 最後の1つ
+    forceOneHit(loop, player);
+    expect(state(loop).phase).toBe('GAME_OVER');
+    expect(state(loop).bossContinuable).toBe(true);
+
+    // 入力可能になってから再開入力 → ボス戦を再挑戦（最初からではない）
+    state(loop).gameoverCanInput = true;
+    const onStart = (loop as unknown as { handleStart: () => void }).handleStart.bind(loop);
+    onStart();
+
+    expect(state(loop).phase).toBe('BOSS_READY');
+    expect(state(loop).bossHearts).toBe(BOSS_PLAYER_HEARTS); // ハート回復
+    expect(boss(loop).hp).toBe(BOSS_MAX_HP);                 // ボスHP回復
+    expect(state(loop).level).toBe(3);                       // ステージ1からやり直しではない
   });
 
   it('BOSS_DEFEATED → ALL_CLEAR after BOSS_DEFEATED_DURATION (returns to ending)', () => {
@@ -490,7 +507,7 @@ describe('GameLoop – boss stage', () => {
   it('resets boss HP when returning to TITLE after the ending', () => {
     const { loop } = makeGameLoop();
     damageBoss(loop, 10);
-    expect(boss(loop).hp).toBe(BOSS_MAX_HP - 10);
+    expect(boss(loop).hp).toBeLessThan(BOSS_MAX_HP); // 削れている
 
     state(loop).phase = 'ALL_CLEAR';
     state(loop).phaseTimer = 0;
