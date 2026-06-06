@@ -103,14 +103,18 @@ export const TOTAL_PARTS = MAX_LEVEL;
 
 // エンディング(ALL_CLEAR)演出の段階境界(秒)。gameLoop のフェーズ継続時間と
 // renderer の描画段階で共有し、両者がズレて演出が途中で切れるのを防ぐ。
-export const ENDING_REPAIR_DONE_TIME = 2.0; // 段階A(回収完了→修理中)の終了
-export const ENDING_LIFTOFF_TIME     = 4.0; // 段階B(修理完了)の終了＝発進開始
-export const ENDING_EPILOGUE_TIME    = 6.5; // 段階C(発進)の終了＝エピローグ開始
-export const ENDING_DURATION         = 9.0; // エンディング全体の長さ(=ALL_CLEAR継続時間)
+// 絵コンテ: 地表に着陸した宇宙船へ飛行士が歩いて乗り込み → 発進 → ワープ → 青い地球へ帰還。
+export const ENDING_WALK_START   = 1.5;  // 段階A(着陸・フェードイン)の終了＝歩行開始
+export const ENDING_BOARD_TIME   = 4.5;  // 段階B(歩いて乗船)の終了＝乗船完了
+export const ENDING_LIFTOFF_TIME = 6.0;  // 段階C(点火)の終了＝発進開始
+export const ENDING_WARP_TIME    = 7.5;  // 段階D(発進・上昇)の終了＝ワープ突入
+export const ENDING_EARTH_TIME   = 10.0; // 段階E(ワープ)の終了＝青い地球の出現
+export const ENDING_DURATION     = 13.5; // 段階F(帰還)の終了＝エンディング全体の長さ(=ALL_CLEAR継続時間)
 
 // エンディング演出パラメータ。drawEnding(renderer) と fireEndingCues(gameLoop) で共有。
-export const ENDING_ROCKET_CX  = CANVAS_WIDTH / 2;        // 噴射原点X(canvas座標)
-export const ENDING_ROCKET_CY  = CANVAS_HEIGHT / 2 + 56;  // 噴射口Y(canvas座標, 発進前の機体足元)
+// (CX, CY) は停泊中の宇宙船の噴射口位置(canvas座標)。renderer の機体・地表レイアウトの基準でもある。
+export const ENDING_ROCKET_CX  = CANVAS_WIDTH * 0.62;     // 停泊位置X(canvas座標, やや右)
+export const ENDING_ROCKET_CY  = CANVAS_HEIGHT * 0.70;    // 噴射口Y=地表ライン(canvas座標, 機体の足元)
 export const ENDING_SHAKE_MAG  = 6;                       // 発進時の画面シェイク最大振幅(px)
 export const ENDING_WARP_FACTOR = 9;                      // 発進中の星のスクロール倍率(ワープ感)
 

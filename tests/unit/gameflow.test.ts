@@ -9,7 +9,8 @@ import { AudioManager } from '../../src/audio.js';
 import { StorageManager } from '../../src/storage.js';
 import {
   COLS, ROWS,
-  ENDING_DURATION, ENDING_REPAIR_DONE_TIME, ENDING_LIFTOFF_TIME, ENDING_EPILOGUE_TIME,
+  ENDING_DURATION, ENDING_WALK_START, ENDING_BOARD_TIME, ENDING_LIFTOFF_TIME,
+  ENDING_WARP_TIME, ENDING_EARTH_TIME,
 } from '../../src/constants.js';
 
 // Minimal Renderer stub that satisfies the type without touching Canvas
@@ -386,10 +387,46 @@ describe('GameLoop – ending stage cues', () => {
     expect(particles.activeCount()).toBeGreaterThan(0);
   });
 
+  it('spawns boarding particles when crossing the board boundary', () => {
+    const { loop } = makeGameLoop();
+    const particles = (loop as unknown as {
+      particles: import('../../src/particles.js').ParticleSystem;
+    }).particles;
+    particles.clear();
+
+    state(loop).phase = 'ALL_CLEAR';
+    state(loop).phaseTimer = ENDING_BOARD_TIME - 0.01;
+    tickFor(loop, 1 / 60); // 乗船境界をまたぐ → 搭乗スパーク
+
+    expect(particles.activeCount()).toBeGreaterThan(0);
+  });
+
+  it('fires REPAIR_DONE (boarding) on crossing the board boundary and not before', () => {
+    const { loop, audio } = makeGameLoop();
+    state(loop).phase = 'ALL_CLEAR';
+    state(loop).phaseTimer = ENDING_BOARD_TIME - 0.01;
+
+    expect(playCount(audio, 'REPAIR_DONE')).toBe(0);
+    tickFor(loop, 1 / 60); // 乗船境界をまたぐ
+    expect(playCount(audio, 'REPAIR_DONE')).toBe(1);
+  });
+
+  it('fires FANFARE (return) on crossing the earth boundary and not before', () => {
+    const { loop, audio } = makeGameLoop();
+    state(loop).phase = 'ALL_CLEAR';
+    state(loop).phaseTimer = ENDING_EARTH_TIME - 0.01;
+
+    expect(playCount(audio, 'FANFARE')).toBe(0);
+    tickFor(loop, 1 / 60); // 地球出現境界をまたぐ
+    expect(playCount(audio, 'FANFARE')).toBe(1);
+  });
+
   // 段階境界が想定どおり昇順で並ぶことを保証（演出が途中で切れないための前提）
   it('keeps ending boundaries strictly ordered within the duration', () => {
-    expect(ENDING_REPAIR_DONE_TIME).toBeLessThan(ENDING_LIFTOFF_TIME);
-    expect(ENDING_LIFTOFF_TIME).toBeLessThan(ENDING_EPILOGUE_TIME);
-    expect(ENDING_EPILOGUE_TIME).toBeLessThan(ENDING_DURATION);
+    expect(ENDING_WALK_START).toBeLessThan(ENDING_BOARD_TIME);
+    expect(ENDING_BOARD_TIME).toBeLessThan(ENDING_LIFTOFF_TIME);
+    expect(ENDING_LIFTOFF_TIME).toBeLessThan(ENDING_WARP_TIME);
+    expect(ENDING_WARP_TIME).toBeLessThan(ENDING_EARTH_TIME);
+    expect(ENDING_EARTH_TIME).toBeLessThan(ENDING_DURATION);
   });
 });

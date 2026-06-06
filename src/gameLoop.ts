@@ -1,7 +1,7 @@
 import type { GameState } from './types.js';
 import {
   INITIAL_LIVES, MAX_LEVEL, getLevelParams, COLORS, getFruitDef,
-  ENDING_DURATION, ENDING_REPAIR_DONE_TIME, ENDING_LIFTOFF_TIME, ENDING_EPILOGUE_TIME,
+  ENDING_DURATION, ENDING_BOARD_TIME, ENDING_LIFTOFF_TIME, ENDING_EARTH_TIME,
   ENDING_ROCKET_CX, ENDING_ROCKET_CY, MAP_OFFSET_Y,
 } from './constants.js';
 import { ParticleSystem } from './particles.js';
@@ -339,18 +339,18 @@ export class GameLoop {
     const px = ENDING_ROCKET_CX;
     const py = ENDING_ROCKET_CY - MAP_OFFSET_Y;
 
-    if (this.crossed(before, after, ENDING_REPAIR_DONE_TIME)) {
-      // 段階B 修理完了: 復旧音＋機体まわりの青緑スパーク
+    if (this.crossed(before, after, ENDING_BOARD_TIME)) {
+      // 段階B→C 乗船完了: 搭乗確定音＋機体まわりの青緑スパーク
       this.audio.play('REPAIR_DONE');
-      this.particles.spawnBurst(px, py - 56, COLORS.PLAYER, 16, 70);
+      this.particles.spawnBurst(px, py - 30, COLORS.PLAYER, 16, 70);
     }
     if (this.crossed(before, after, ENDING_LIFTOFF_TIME)) {
-      // 段階C 発進: 轟音＋噴射口からのオレンジ大量バースト
+      // 段階C→D 発進: 轟音＋噴射口からのオレンジ大量バースト
       this.audio.play('LIFTOFF');
       this.particles.spawnBurst(px, py, COLORS.SHIP_THRUSTER, 40, 150);
     }
-    if (this.crossed(before, after, ENDING_EPILOGUE_TIME)) {
-      // 段階D エピローグ: 帰還のファンファーレ
+    if (this.crossed(before, after, ENDING_EARTH_TIME)) {
+      // 段階E→F 帰還: 青い地球が見えてくるファンファーレ
       this.audio.play('FANFARE');
     }
   }

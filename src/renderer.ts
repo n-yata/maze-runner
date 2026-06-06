@@ -2,8 +2,9 @@ import type { GameState, GhostState, Direction } from './types.js';
 import {
   TILE_SIZE, CANVAS_WIDTH, CANVAS_HEIGHT, MAP_OFFSET_Y,
   COLORS, GHOST_COLORS, getFruitDef, TOTAL_PARTS,
-  ENDING_REPAIR_DONE_TIME, ENDING_LIFTOFF_TIME, ENDING_EPILOGUE_TIME,
-  ENDING_SHAKE_MAG, ENDING_WARP_FACTOR,
+  ENDING_WALK_START, ENDING_BOARD_TIME, ENDING_LIFTOFF_TIME,
+  ENDING_WARP_TIME, ENDING_EARTH_TIME, ENDING_DURATION,
+  ENDING_ROCKET_CX, ENDING_ROCKET_CY, ENDING_SHAKE_MAG, ENDING_WARP_FACTOR,
 } from './constants.js';
 import type { MapManager } from './map.js';
 import type { PlayerManager } from './player.js';
@@ -14,6 +15,11 @@ import type { ParticleSystem } from './particles.js';
 import type { LaserManager } from './laser.js';
 
 export class Renderer {
+  // 青い地球(drawEarth)の陸地パッチ配置 [dx, dy, 半径比]。毎フレーム生成を避けて定数化。
+  private static readonly EARTH_PATCHES: ReadonlyArray<readonly [number, number, number]> = [
+    [-0.3, -0.1, 0.28], [0.25, 0.15, 0.22], [0.05, -0.4, 0.16], [-0.15, 0.4, 0.2],
+  ];
+
   private ctx: CanvasRenderingContext2D;
   private bgCtx: CanvasRenderingContext2D | null = null;
   private starfield = new Starfield();
@@ -56,9 +62,9 @@ export class Renderer {
       const now = performance.now();
       const dtMs = this.lastBgTime !== null ? Math.min(now - this.lastBgTime, 100) : 16.7;
       this.lastBgTime = now;
-      // エンディングの発進段階だけ星を加速させ「ワープ感」を出す
+      // エンディングのワープ段階だけ星を加速させ「ワープ感」を出す
       const warping = state.phase === 'ALL_CLEAR'
-        && state.phaseTimer >= ENDING_LIFTOFF_TIME && state.phaseTimer < ENDING_EPILOGUE_TIME;
+        && state.phaseTimer >= ENDING_WARP_TIME && state.phaseTimer < ENDING_EARTH_TIME;
       this.starfield.setWarp(warping ? ENDING_WARP_FACTOR : 1);
       this.starfield.draw(this.bgCtx, dtMs);
     }
@@ -119,9 +125,8 @@ export class Renderer {
         break;
 
       case 'ALL_CLEAR':
-        // エンディング: 修理→発進の演出（盤面は背景的に残す）
-        map.drawTo(ctx, MAP_OFFSET_Y);
-        this.drawEnding(state.phaseTimer, state.partsCollected);
+        // エンディング: 帰還シーン（盤面マップは出さず、背景の星空のみを舞台にする）
+        this.drawEnding(state.phaseTimer);
         break;
 
       case 'GAME_OVER':
@@ -611,58 +616,168 @@ export class Renderer {
   }
 
   /**
-   * エンディング: 全部品回収 → 修理 → 発進 → エピローグの4段階演出。timer(秒)で進む。
+   * エンディング(帰還シーン): 着陸 → 歩いて乗船 → 点火 → 発進 → ワープ → 青い地球へ帰還の6段階。
+   * timer(秒)だけを入力に決定論的に組み立てる。盤面マップは描かず、背景の星空のみを舞台にする。
    * 段階境界は constants の ENDING_* と共有（gameLoop の音/パーティクル発火と一致）。
    */
-  private drawEnding(timer: number, parts: number): void {
-    const cx = CANVAS_WIDTH / 2;
-    const cy = CANVAS_HEIGHT / 2;
+  private drawEnding(timer: number): void {
     const ctx = this.ctx;
+    const cx = CANVAS_WIDTH / 2;
 
-    // 発進段階(C)は画面全体を揺らす。timer 駆動で決定論的に減衰する。
+    // シーンのレイアウト基準（停泊位置・地表ライン・機体中心）。constants と一致させる。
+    const groundY = ENDING_ROCKET_CY;                  // 噴射口＝地表ライン
+    const shipX = ENDING_ROCKET_CX;                    // 停泊X
+    const shipParkCy = groundY - TILE_SIZE * 0.42;     // 停泊時の機体中心Y（噴射口が地表に来る）
+    const astroR = TILE_SIZE / 2;                      // 飛行士の描画半径
+    const astroStandY = groundY - astroR * 0.95;       // 足が地表に着く中心Y
+    const walkStartX = CANVAS_WIDTH * 0.18;            // 歩き出しX（左）
+
+    // 点火(C)・発進(D)段階は画面を揺らす。timer 駆動で決定論的に増減する。
     ctx.save();
-    if (timer >= ENDING_LIFTOFF_TIME && timer < ENDING_EPILOGUE_TIME) {
-      const p = (timer - ENDING_LIFTOFF_TIME) / (ENDING_EPILOGUE_TIME - ENDING_LIFTOFF_TIME); // 0→1
-      const mag = ENDING_SHAKE_MAG * (1 - p); // 発進直後が最大、終盤で収束
-      ctx.translate(Math.sin(timer * 53) * mag, Math.cos(timer * 61) * mag);
+    let shake = 0;
+    if (timer >= ENDING_BOARD_TIME && timer < ENDING_LIFTOFF_TIME) {
+      shake = ENDING_SHAKE_MAG * ((timer - ENDING_BOARD_TIME) / (ENDING_LIFTOFF_TIME - ENDING_BOARD_TIME)); // 0→最大
+    } else if (timer >= ENDING_LIFTOFF_TIME && timer < ENDING_WARP_TIME) {
+      shake = ENDING_SHAKE_MAG * (1 - (timer - ENDING_LIFTOFF_TIME) / (ENDING_WARP_TIME - ENDING_LIFTOFF_TIME)); // 最大→0
     }
+    if (shake > 0) ctx.translate(Math.sin(timer * 53) * shake, Math.cos(timer * 61) * shake);
 
-    // 段階A(0〜ENDING_REPAIR_DONE_TIME): 回収完了 → 修理開始
-    if (timer < ENDING_REPAIR_DONE_TIME) {
-      this.drawPanel(cy, 120);
-      const k = Math.min(1, timer / 0.4);
-      this.glowText('全部品 回収完了', cx, cy - 40, `bold ${TILE_SIZE + 4}px monospace`, '#7DF0FF', 14, 'center', k);
-      this.glowText(`◇ ${parts}/${TOTAL_PARTS} ◇`, cx, cy - 6, `${TILE_SIZE}px monospace`, COLORS.POWER_DOT, 8, 'center', k);
-      this.glowText('宇宙船を 修理中...', cx, cy + 34, `${TILE_SIZE - 4}px monospace`, '#9FD0FF', 6, 'center', this.pulseAlpha());
+    // 段階A(0〜ENDING_WALK_START): 着陸 — 地表＋停泊船＋飛行士をフェードイン
+    if (timer < ENDING_WALK_START) {
+      const fade = Math.min(1, timer / 0.6);
+      this.drawSurface(fade);
+      this.drawRocket(shipX, shipParkCy, 0);
+      this.drawAstronautAt(walkStartX, astroStandY, astroR, 'RIGHT', timer * 0.6, fade);
       ctx.restore();
       return;
     }
 
-    // 段階B(ENDING_REPAIR_DONE_TIME〜ENDING_LIFTOFF_TIME): システム復旧（グロー脈動）
+    // 段階B(ENDING_WALK_START〜ENDING_BOARD_TIME): 飛行士が船まで歩いて乗船
+    if (timer < ENDING_BOARD_TIME) {
+      const p = (timer - ENDING_WALK_START) / (ENDING_BOARD_TIME - ENDING_WALK_START); // 0→1
+      const ease = p * p * (3 - 2 * p); // smoothstep
+      const x = walkStartX + (shipX - walkStartX) * ease;
+      const fade = p > 0.85 ? Math.max(0, 1 - (p - 0.85) / 0.15) : 1; // ハッチへ消える
+      this.drawSurface(1);
+      this.drawRocket(shipX, shipParkCy, 0);
+      this.drawAstronautAt(x, astroStandY, astroR, 'RIGHT', timer * 3, fade);
+      ctx.restore();
+      return;
+    }
+
+    // 段階C(ENDING_BOARD_TIME〜ENDING_LIFTOFF_TIME): 点火 — スラスター炎が立ち上がる
     if (timer < ENDING_LIFTOFF_TIME) {
-      this.drawPanel(cy, 120);
-      const pulse = 0.6 + 0.4 * Math.sin((timer - ENDING_REPAIR_DONE_TIME) * 6);
-      this.glowText('修理 完了', cx, cy - 34, `bold ${TILE_SIZE + 4}px monospace`, '#46F0D8', 16, 'center', 1);
-      this.glowText('システム オールグリーン', cx, cy + 6, `${TILE_SIZE - 5}px monospace`, '#2BE0A8', 8, 'center', pulse);
-      this.drawRocket(cx, cy + 56, 0); // 発進前の機体
+      const ignite = (timer - ENDING_BOARD_TIME) / (ENDING_LIFTOFF_TIME - ENDING_BOARD_TIME); // 0→1
+      this.drawSurface(1);
+      this.drawRocket(shipX, shipParkCy, ignite * 0.6);
       ctx.restore();
       return;
     }
 
-    // 段階C(ENDING_LIFTOFF_TIME〜ENDING_EPILOGUE_TIME): 発進（ワープライン＋上昇）
-    if (timer < ENDING_EPILOGUE_TIME) {
-      const lift = (timer - ENDING_LIFTOFF_TIME) / (ENDING_EPILOGUE_TIME - ENDING_LIFTOFF_TIME); // 0→1
-      this.drawWarpLines(lift);
-      const rocketY = cy + 56 - lift * (cy + 120); // 画面上方へ上昇し画面外へ
-      this.drawRocket(cx, rocketY, lift);
-      this.glowText('発進！', cx, cy - 30, `bold ${TILE_SIZE * 2}px monospace`, '#7DF0FF', 18, 'center', Math.min(1, lift * 2));
+    // 段階D(ENDING_LIFTOFF_TIME〜ENDING_WARP_TIME): 発進 — 上昇して画面外へ。地表は下へ退く
+    if (timer < ENDING_WARP_TIME) {
+      const lift = (timer - ENDING_LIFTOFF_TIME) / (ENDING_WARP_TIME - ENDING_LIFTOFF_TIME); // 0→1
+      this.drawSurface(1 - lift);
+      const rocketY = shipParkCy - lift * (shipParkCy + 100); // 上方へ上昇し画面外へ
+      this.drawRocket(shipX, rocketY, 0.6 + lift * 0.4);
       ctx.restore();
       return;
     }
 
-    // 段階D(ENDING_EPILOGUE_TIME〜ENDING_DURATION): 帰還エピローグ
-    ctx.restore(); // この段階はシェイクなし
-    this.drawEndingEpilogue(timer);
+    ctx.restore(); // 以降の段階はシェイクなし
+
+    // 段階E(ENDING_WARP_TIME〜ENDING_EARTH_TIME): ワープ — ストリーク加速→終盤で減速
+    if (timer < ENDING_EARTH_TIME) {
+      const p = (timer - ENDING_WARP_TIME) / (ENDING_EARTH_TIME - ENDING_WARP_TIME); // 0→1
+      const intensity = p < 0.7 ? p / 0.7 : Math.max(0, 1 - (p - 0.7) / 0.3); // 立ち上がり→減速
+      this.drawWarpLines(intensity);
+      return; // ctx.restore() は上で実行済み（冒頭 save の解放は1回のみ）
+    }
+
+    // 段階F(ENDING_EARTH_TIME〜ENDING_DURATION): 帰還 — 青い地球が出現して接近。導線のみ表示
+    const local = (timer - ENDING_EARTH_TIME) / (ENDING_DURATION - ENDING_EARTH_TIME); // 0→1
+    const earthCx = cx;
+    const earthCy = CANVAS_HEIGHT * 0.42;
+    const earthR = TILE_SIZE * (1.4 + local * 4.6); // 接近で拡大
+    const earthAlpha = Math.min(1, local / 0.3);    // 出現フェードイン
+    this.drawEarth(earthCx, earthCy, earthR, earthAlpha);
+    this.glowText('Press SPACE / Tap', cx, CANVAS_HEIGHT * 0.86,
+      `${TILE_SIZE - 3}px monospace`, '#FFFFFF', 8, 'center', this.pulseAlpha() * earthAlpha);
+  }
+
+  /** 指定座標に飛行士を描く（歩行/待機演出用）。anim は歩行アニメ位相、alpha は表示濃度。 */
+  private drawAstronautAt(x: number, y: number, r: number, dir: Direction, anim: number, alpha: number): void {
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.translate(x, y);
+    this.drawAstronautBody(r, dir, anim);
+    ctx.restore();
+  }
+
+  /** 惑星の地表（画面下部のホライズン＋地面グラデ）。alpha で出現/退場を制御。 */
+  private drawSurface(alpha: number): void {
+    if (alpha <= 0) return;
+    const ctx = this.ctx;
+    const groundY = ENDING_ROCKET_CY;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+
+    // 地面（ホライズンから下へ向かう暗い惑星表面）
+    const grad = ctx.createLinearGradient(0, groundY, 0, CANVAS_HEIGHT);
+    grad.addColorStop(0, '#243A52');
+    grad.addColorStop(1, '#0A1526');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, groundY, CANVAS_WIDTH, CANVAS_HEIGHT - groundY);
+
+    // ホライズンの発光ライン
+    ctx.strokeStyle = COLORS.PLAYER;
+    ctx.shadowColor = COLORS.PLAYER;
+    ctx.shadowBlur = 10;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(0, groundY);
+    ctx.lineTo(CANVAS_WIDTH, groundY);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  /** 青い地球。大気グロー＋海陸の放射グラデ。alpha で出現フェードイン。 */
+  private drawEarth(cx: number, cy: number, r: number, alpha: number): void {
+    if (alpha <= 0) return;
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+
+    // 大気グロー（加算合成でにじむ縁）
+    ctx.globalCompositeOperation = 'lighter';
+    const halo = ctx.createRadialGradient(cx, cy, r * 0.9, cx, cy, r * 1.35);
+    halo.addColorStop(0, 'rgba(120,200,255,0.45)');
+    halo.addColorStop(1, 'rgba(120,200,255,0)');
+    ctx.fillStyle = halo;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r * 1.35, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 本体（左上から光が当たる海洋ブルーの球）
+    ctx.globalCompositeOperation = 'source-over';
+    const body = ctx.createRadialGradient(cx - r * 0.35, cy - r * 0.35, r * 0.1, cx, cy, r);
+    body.addColorStop(0, '#9FD8FF');
+    body.addColorStop(0.5, '#2E7CC4');
+    body.addColorStop(1, '#0B2A4A');
+    ctx.fillStyle = body;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 陸地（緑のパッチを数枚、決定論的に配置）
+    ctx.fillStyle = 'rgba(70,176,120,0.55)';
+    for (const [dx, dy, pr] of Renderer.EARTH_PATCHES) {
+      ctx.beginPath();
+      ctx.ellipse(cx + dx * r, cy + dy * r, pr * r, pr * r * 0.7, dx, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
   }
 
   /** 発進段階のワープ演出。上方向へ流れる白ストリークを加算合成で重ねる。progress(0..1)で伸長。 */
@@ -687,33 +802,6 @@ export class Renderer {
       ctx.stroke();
     }
     ctx.restore();
-  }
-
-  /** 帰還エピローグ。物語の締めテキストを1行ずつ reveal し、最後に開始導線を出す。 */
-  private drawEndingEpilogue(timer: number): void {
-    const cx = CANVAS_WIDTH / 2;
-    const cy = CANVAS_HEIGHT / 2;
-    const local = timer - ENDING_EPILOGUE_TIME; // 0→(ENDING_DURATION-ENDING_EPILOGUE_TIME)
-
-    this.drawPanel(cy, 130);
-    this.glowText('RESCUE COMPLETE', cx, cy - 74, `bold ${TILE_SIZE + 2}px monospace`, '#FFE66D', 14, 'center', Math.min(1, local / 0.4));
-
-    const lines = [
-      'きみは深宇宙を越え',
-      '故郷の空へ還ってきた',
-      '',
-      'ありがとう、宇宙飛行士',
-    ];
-    const lineH = TILE_SIZE - 2;
-    const startY = cy - 34;
-    for (let i = 0; i < lines.length; i++) {
-      const text = lines[i];
-      if (!text) continue;
-      const reveal = Math.min(1, Math.max(0, (local - 0.4 - i * 0.35) / 0.4));
-      this.glowText(text, cx, startY + i * lineH, `${TILE_SIZE - 6}px monospace`, '#CFE6FF', 5, 'center', reveal);
-    }
-
-    this.glowText('Press SPACE / Tap', cx, cy + 92, `${TILE_SIZE - 3}px monospace`, '#FFFFFF', 8, 'center', this.pulseAlpha());
   }
 
   /** 簡易ロケット。lift(0..1) でスラスター炎を伸ばし上昇感を出す。 */
