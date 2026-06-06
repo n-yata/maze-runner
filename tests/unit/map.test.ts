@@ -234,14 +234,14 @@ describe('MapManager - ボス闘技場 (resetBossArena)', () => {
     expect(reachable.size).toBe(passable);
   });
 
-  it('バリア供給源のパワーエサが配置されている', () => {
+  it('パワーエサは配置しない（被弾はハート制で管理しバリアは使わない）', () => {
     let power = 0;
     for (let r = 0; r < ROWS; r++) {
       for (let c = 0; c < COLS; c++) {
         if (map.isPowerDot(c, r)) power++;
       }
     }
-    expect(power).toBeGreaterThan(0);
+    expect(power).toBe(0);
   });
 
   it('フルーツ有効位置が非空（詰み防止の前提）', () => {

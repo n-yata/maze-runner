@@ -12,16 +12,14 @@ import {
   ENDING_DURATION, ENDING_FADEOUT_DURATION, ENDING_WALK_START, ENDING_RAMP_TIME, ENDING_BOARD_TIME,
   ENDING_LIFTOFF_TIME, ENDING_WARP_TIME, ENDING_EARTH_TIME,
   BOSS_READY_DURATION, BOSS_DEFEATED_DURATION, BOSS_MAX_HP,
+  BOSS_PLAYER_HEARTS,
 } from '../../src/constants.js';
 import type { BossManager } from '../../src/boss.js';
 import type { Beam } from '../../src/laser.js';
 
-// GameLoop 内部の BossManager / bossActive へアクセスするヘルパー（テスト専用）
+// GameLoop 内部の BossManager へアクセスするヘルパー（テスト専用）
 function boss(loop: GameLoop): BossManager {
   return (loop as unknown as { boss: BossManager }).boss;
-}
-function setBossActive(loop: GameLoop, active: boolean): void {
-  (loop as unknown as { bossActive: boolean }).bossActive = active;
 }
 /** ボス本体中心に当たるビームを n 本当ててHPを削る（テスト用の直接ダメージ）。 */
 function damageBoss(loop: GameLoop, hits: number): void {
@@ -30,6 +28,28 @@ function damageBoss(loop: GameLoop, hits: number): void {
   const beams: Beam[] = [];
   for (let i = 0; i < hits; i++) beams.push({ active: true, x: c.x, y: c.y, dx: 0, dy: -1 });
   b.hitByBeams(beams);
+}
+/** ボス戦に入って BOSS フェーズまで進める。 */
+function enterBossPhase(loop: GameLoop): void {
+  state(loop).phase = 'STAGE_CLEAR';
+  state(loop).phaseTimer = 0;
+  state(loop).level = 3;
+  tickFor(loop, 2.1);                       // → BOSS_READY
+  tickFor(loop, BOSS_READY_DURATION + 0.1); // → BOSS
+}
+/**
+ * プレイヤーを生存中のボス弾に重ね、無敵を解除して1フレーム進める＝確実に1回被弾させる。
+ * 事前に無敵を張って弾を湧かせてから重ねるので、湧かし中の偶発被弾を避けられる。
+ */
+function forceOneHit(loop: GameLoop, player: PlayerManager): void {
+  state(loop).bossInvuln = 999;     // 弾を湧かせる間は無敵にして偶発被弾を防ぐ
+  tickFor(loop, 1.0);
+  const bullets = boss(loop).getBullets();
+  if (bullets.length === 0) throw new Error('no boss bullets to collide with');
+  const target = bullets[0]!;
+  player.state.pixelPos = { x: target.x, y: target.y };
+  state(loop).bossInvuln = 0;        // 無敵解除＝この弾で被弾する
+  tickFor(loop, 1 / 60);
 }
 
 // Minimal Renderer stub that satisfies the type without touching Canvas
@@ -386,19 +406,49 @@ describe('GameLoop – boss stage', () => {
     expect(state(loop).phase).toBe('BOSS_READY');
   });
 
-  it('BOSS → PLAYER_DEAD when the player is hit', () => {
+  it('initializes the player hearts when the boss stage starts', () => {
+    const { loop } = makeGameLoop();
+    enterBossPhase(loop);
+    expect(state(loop).phase).toBe('BOSS');
+    expect(state(loop).bossHearts).toBe(BOSS_PLAYER_HEARTS);
+  });
+
+  it('a boss hit costs one heart and the fight continues (no respawn / no PLAYER_DEAD)', () => {
     const { loop, player } = makeGameLoop();
-    state(loop).phase = 'BOSS';
-    setBossActive(loop, true);
-    player.die();
+    enterBossPhase(loop);
+    const before = state(loop).bossHearts;
+    forceOneHit(loop, player);
+    expect(state(loop).phase).toBe('BOSS'); // その場で続行
+    expect(state(loop).bossHearts).toBe(before - 1);
+    expect(state(loop).bossInvuln).toBeGreaterThan(0); // 被弾後の無敵が張られる
+  });
+
+  it('grants brief invulnerability so a second bullet does not cost another heart immediately', () => {
+    const { loop, player } = makeGameLoop();
+    enterBossPhase(loop);
+    forceOneHit(loop, player);
+    const hearts = state(loop).bossHearts;
+    // 無敵中に別の弾へ重ねても減らない
+    const bullets = boss(loop).getBullets();
+    if (bullets.length > 0) {
+      player.state.pixelPos = { x: bullets[0]!.x, y: bullets[0]!.y };
+    }
     tickFor(loop, 1 / 60);
-    expect(state(loop).phase).toBe('PLAYER_DEAD');
+    expect(state(loop).bossHearts).toBe(hearts);
+  });
+
+  it('runs out of hearts → GAME_OVER (no respawn)', () => {
+    const { loop, player } = makeGameLoop();
+    enterBossPhase(loop);
+    state(loop).bossHearts = 1; // 最後の1つ
+    forceOneHit(loop, player);
+    expect(state(loop).phase).toBe('GAME_OVER');
+    expect(state(loop).bossHearts).toBe(0);
   });
 
   it('BOSS → BOSS_DEFEATED when boss HP reaches 0', () => {
     const { loop } = makeGameLoop();
-    state(loop).phase = 'BOSS';
-    setBossActive(loop, true);
+    enterBossPhase(loop);
     damageBoss(loop, BOSS_MAX_HP); // HPを0にする
     expect(boss(loop).isDefeated).toBe(true);
     tickFor(loop, 1 / 60);
@@ -408,45 +458,18 @@ describe('GameLoop – boss stage', () => {
   it('does NOT clear the boss stage while HP remains (no early clear)', () => {
     const { loop } = makeGameLoop();
     state(loop).phase = 'BOSS';
-    setBossActive(loop, true);
-    tickFor(loop, 1.0); // レーザーを当てていないのでHPは満タンのまま
+    state(loop).bossHearts = BOSS_PLAYER_HEARTS;
+    state(loop).bossInvuln = 999; // 被弾でゲームオーバーにならないよう無敵に
+    damageBoss(loop, BOSS_MAX_HP - 1); // HPを1だけ残す
+    tickFor(loop, 0.5);
     expect(boss(loop).hp).toBeGreaterThan(0);
     expect(state(loop).phase).not.toBe('BOSS_DEFEATED');
-  });
-
-  it('respawns into BOSS_READY with boss HP retained when a life remains', () => {
-    const { loop } = makeGameLoop();
-    setBossActive(loop, true);
-    damageBoss(loop, 5); // HP を 5 削る
-    const hpAfterDamage = boss(loop).hp;
-    expect(hpAfterDamage).toBe(BOSS_MAX_HP - 5);
-
-    state(loop).phase = 'PLAYER_DEAD';
-    state(loop).phaseTimer = 0;
-    state(loop).lives = 2;
-    tickFor(loop, 1.6);
-
-    expect(state(loop).phase).toBe('BOSS_READY');
-    expect(state(loop).lives).toBe(1);
-    expect(boss(loop).hp).toBe(hpAfterDamage); // 削った進捗は維持
-  });
-
-  it('PLAYER_DEAD(boss, no lives) → GAME_OVER', () => {
-    const { loop } = makeGameLoop();
-    setBossActive(loop, true);
-    state(loop).phase = 'PLAYER_DEAD';
-    state(loop).phaseTimer = 0;
-    state(loop).lives = 1;
-    tickFor(loop, 1.6);
-    expect(state(loop).phase).toBe('GAME_OVER');
-    expect(state(loop).lives).toBe(0);
   });
 
   it('BOSS_DEFEATED → ALL_CLEAR after BOSS_DEFEATED_DURATION (returns to ending)', () => {
     const { loop } = makeGameLoop();
     state(loop).phase = 'BOSS_DEFEATED';
     state(loop).phaseTimer = 0;
-    setBossActive(loop, true);
     tickFor(loop, BOSS_DEFEATED_DURATION + 0.1);
     expect(state(loop).phase).toBe('ALL_CLEAR');
   });

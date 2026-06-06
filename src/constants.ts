@@ -223,6 +223,10 @@ export function getLevelParams(level: number): LevelParams {
 export const BOSS_READY_DURATION    = 2.5; // WARNING導入の表示時間(秒)
 export const BOSS_DEFEATED_DURATION = 2.5; // 撃破演出→ALL_CLEAR への猶予(秒)
 
+// プレイヤー体力（シューティング風: 被弾でリトライせずハートを消費し、0でゲームオーバー）
+export const BOSS_PLAYER_HEARTS = 3;   // ボス戦のハート数
+export const BOSS_HIT_INVULN    = 1.2; // 被弾後の無敵時間(秒)。連続被弾防止＋点滅表示
+
 // HP・ダメージ
 export const BOSS_MAX_HP      = 60;            // 初期HP。レーザー1ヒット=1ダメージ → 60ヒットで撃破
 export const BOSS_HIT_DAMAGE  = 1;             // レーザー1ヒットの与ダメ

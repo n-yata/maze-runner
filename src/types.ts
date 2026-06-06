@@ -60,6 +60,8 @@ export interface GameState {
   lives: number;
   level: number;
   partsCollected: number; // 回収した宇宙船の部品数(0〜MAX_LEVEL)。永続化せず1プレイで完結
+  bossHearts: number;     // ボス戦のプレイヤー体力(ハート)。被弾で減り0でゲームオーバー。通常面では未使用
+  bossInvuln: number;     // ボス戦の被弾後 無敵残り時間(秒)。連続被弾防止＋点滅表示用
   dotsEaten: number;
   modeTimer: number;
   modeIndex: number;

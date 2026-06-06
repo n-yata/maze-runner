@@ -144,6 +144,7 @@ export class Renderer {
         this.drawFruit(fruitMgr);
         this.drawPlayer(player);
         if (boss) { this.drawBoss(boss); this.drawBossHpBar(boss); }
+        this.drawBossHearts(state.bossHearts);
         this.drawBossWarning(state.phaseTimer);
         break;
 
@@ -151,13 +152,17 @@ export class Renderer {
         map.drawTo(ctx, MAP_OFFSET_Y);
         map.drawDots(ctx, MAP_OFFSET_Y);
         this.drawFruit(fruitMgr);
-        this.drawPlayer(player);
+        // 被弾後の無敵中はプレイヤーを点滅させる
+        if (!(state.bossInvuln > 0 && Math.floor(performance.now() / 100) % 2 === 0)) {
+          this.drawPlayer(player);
+        }
         if (laser) this.drawLaser(laser);
         if (boss) {
           this.drawBoss(boss);
           this.drawBossBullets(boss);
           this.drawBossHpBar(boss);
         }
+        this.drawBossHearts(state.bossHearts);
         break;
 
       case 'BOSS_DEFEATED':
@@ -1287,16 +1292,44 @@ export class Renderer {
     this.glowText('BOSS', x, y - 4, `${TILE_SIZE - 8}px monospace`, '#FF5C6E', 6, 'left');
   }
 
-  /** ボス戦の導入（WARNING）。点滅する警告で「最終関門」を伝える。 */
+  /** プレイヤー体力のハートを盤面上部左に並べて描く（残数 = hearts）。 */
+  private drawBossHearts(hearts: number): void {
+    if (hearts <= 0) return;
+    const ctx = this.ctx;
+    const s = TILE_SIZE * 0.5;        // ハートのサイズ
+    const gap = TILE_SIZE * 0.78;
+    const y = MAP_OFFSET_Y + TILE_SIZE * 1.4;
+    ctx.save();
+    ctx.fillStyle = '#FF4D5E';
+    ctx.shadowColor = '#FF4D5E';
+    ctx.shadowBlur = 8;
+    for (let i = 0; i < hearts; i++) {
+      const cx = TILE_SIZE + i * gap;
+      ctx.beginPath();
+      ctx.arc(cx - s * 0.3, y, s * 0.32, 0, Math.PI * 2);
+      ctx.arc(cx + s * 0.3, y, s * 0.32, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(cx - s * 0.6, y + s * 0.06);
+      ctx.lineTo(cx, y + s * 0.78);
+      ctx.lineTo(cx + s * 0.6, y + s * 0.06);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  /** ボス戦の導入（WARNING）。点滅する警告で「最終関門」と操作（左右移動）を伝える。 */
   private drawBossWarning(timer: number): void {
     const cx = CANVAS_WIDTH / 2;
     const cy = CANVAS_HEIGHT / 2;
     const fade = Math.min(1, timer / 0.4);
-    this.drawPanel(cy, 80);
+    this.drawPanel(cy, 90);
     const blink = (0.5 + 0.5 * Math.sin(performance.now() / 180)) * fade;
-    this.glowText('⚠ WARNING ⚠', cx, cy - 20, `bold ${TILE_SIZE + 2}px monospace`, '#FF4D5E', 14, 'center', blink);
-    this.glowText('BOSS APPROACHING', cx, cy + 16, `bold ${TILE_SIZE}px monospace`, '#FFE08A', 10, 'center', fade);
-    this.glowText('最終関門 — 司令官を撃て', cx, cy + 46, `${TILE_SIZE - 6}px monospace`, '#CFE6FF', 6, 'center', fade);
+    this.glowText('⚠ WARNING ⚠', cx, cy - 28, `bold ${TILE_SIZE + 2}px monospace`, '#FF4D5E', 14, 'center', blink);
+    this.glowText('BOSS APPROACHING', cx, cy + 6, `bold ${TILE_SIZE}px monospace`, '#FFE08A', 10, 'center', fade);
+    this.glowText('← → で弾を避けて 上へ撃て', cx, cy + 36, `${TILE_SIZE - 7}px monospace`, '#CFE6FF', 6, 'center', fade);
+    this.glowText('ハート3つ — 被弾注意', cx, cy + 60, `${TILE_SIZE - 8}px monospace`, '#FF8A9A', 5, 'center', fade);
   }
 
   /** ボス撃破演出（フラッシュ＋爆散リング＋破片）。完了後に gameLoop が帰還エンディングへ接続する。 */

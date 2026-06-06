@@ -159,7 +159,7 @@ type GamePhase =
   | 'PLAYER_DEAD' // プレイヤー死亡アニメーション
   | 'STAGE_CLEAR' // ステージクリアアニメーション（部品 n/3 回収を表示）
   | 'BOSS_READY'  // ボス戦導入（ステージ3クリア後の最終関門。WARNING表示）
-  | 'BOSS'        // ボス戦本編（HP制・弾幕。レーザーで反撃しバリアで被弾を防ぐ）
+  | 'BOSS'        // ボス戦本編（縦シューティング: 左右移動のみ・レーザーは常に上方へ連射・弾を避けボスHPを削る。被弾はハート制で0でゲームオーバー）
   | 'BOSS_DEFEATED' // ボス撃破演出（完了後に ALL_CLEAR へ接続）
   | 'ALL_CLEAR'   // エンディング（盤面を出さず星空を舞台に、大型シャトルへ着陸→歩行→タラップ乗船→点火→発進→ワープ→青い地球へ帰還する7段階の帰還シーン）
   | 'GAME_OVER';  // ゲームオーバー画面
@@ -547,7 +547,8 @@ stateDiagram-v2
     STAGE_CLEAR --> BOSS_READY: 2秒後（level>=3: 最終関門のボス戦へ）
 
     BOSS_READY --> BOSS: WARNING表示後
-    BOSS --> PLAYER_DEAD: ボス弾被弾（バリアなし）
+    BOSS --> BOSS: ボス弾被弾（ハート-1＋無敵。その場で続行）
+    BOSS --> GAME_OVER: ハートを使い切る
     BOSS --> BOSS_DEFEATED: ボスHP0
     BOSS_DEFEATED --> ALL_CLEAR: 撃破演出後（帰還エンディングへ）
 
