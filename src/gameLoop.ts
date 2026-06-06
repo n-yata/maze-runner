@@ -1,7 +1,7 @@
 import type { GameState } from './types.js';
 import {
   INITIAL_LIVES, MAX_LEVEL, getLevelParams, COLORS, getFruitDef,
-  ENDING_DURATION, ENDING_RAMP_TIME, ENDING_BOARD_TIME, ENDING_LIFTOFF_TIME, ENDING_EARTH_TIME,
+  ENDING_DURATION, ENDING_FADEOUT_DURATION, ENDING_RAMP_TIME, ENDING_BOARD_TIME, ENDING_LIFTOFF_TIME, ENDING_EARTH_TIME,
   ENDING_ROCKET_CX, ENDING_ROCKET_CY, MAP_OFFSET_Y,
 } from './constants.js';
 import { ParticleSystem } from './particles.js';
@@ -22,7 +22,9 @@ const INTRO_DURATION       = 7.0;
 const READY_DURATION       = 3.0;
 const DEAD_DURATION        = 1.5;
 const CLEAR_DURATION       = 2.0;
-const ALL_CLEAR_DURATION   = ENDING_DURATION; // renderer の drawEnding と段階境界を共有
+// 帰還シーン(ENDING_DURATION)＋暗転(ENDING_FADEOUT_DURATION)を終えてからタイトルへ戻る。
+// renderer の drawEnding と段階境界を共有する。
+const ALL_CLEAR_DURATION   = ENDING_DURATION + ENDING_FADEOUT_DURATION;
 const GAMEOVER_INPUT_DELAY = 3.0;
 
 export class GameLoop {

@@ -111,7 +111,8 @@ export const ENDING_BOARD_TIME   = 5.5;  // 段階C(タラップを上り乗船)
 export const ENDING_LIFTOFF_TIME = 7.0;  // 段階D(点火)の終了＝発進開始
 export const ENDING_WARP_TIME    = 9.0;  // 段階E(発進・上昇)の終了＝ワープ突入
 export const ENDING_EARTH_TIME   = 11.0; // 段階F(ワープ)の終了＝青い地球の出現
-export const ENDING_DURATION     = 15.0; // 段階G(帰還)の終了＝エンディング全体の長さ(=ALL_CLEAR継続時間)
+export const ENDING_DURATION     = 17.0; // 段階G(帰還＋GAME CLEARナレーション)の終了＝帰還シーンの長さ
+export const ENDING_FADEOUT_DURATION = 2.0; // 段階H(暗転)の長さ。完了後にタイトルへ戻る(ALL_CLEAR継続時間 = ENDING_DURATION + これ)
 
 // エンディング演出パラメータ。drawEnding(renderer) と fireEndingCues(gameLoop) で共有。
 // (CX, CY) は着陸したシャトルのエンジン噴射口位置(canvas座標)。renderer の機体・地表レイアウトの基準でもある。

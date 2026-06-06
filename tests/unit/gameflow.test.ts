@@ -9,7 +9,7 @@ import { AudioManager } from '../../src/audio.js';
 import { StorageManager } from '../../src/storage.js';
 import {
   COLS, ROWS,
-  ENDING_DURATION, ENDING_WALK_START, ENDING_RAMP_TIME, ENDING_BOARD_TIME,
+  ENDING_DURATION, ENDING_FADEOUT_DURATION, ENDING_WALK_START, ENDING_RAMP_TIME, ENDING_BOARD_TIME,
   ENDING_LIFTOFF_TIME, ENDING_WARP_TIME, ENDING_EARTH_TIME,
 } from '../../src/constants.js';
 
@@ -251,11 +251,15 @@ describe('GameLoop – phase transitions', () => {
     expect(state(loop).level).toBe(3);
   });
 
-  it('ALL_CLEAR → TITLE after ENDING_DURATION', () => {
+  it('stays in ALL_CLEAR during the fade-out, then returns to TITLE after it completes', () => {
     const { loop } = makeGameLoop();
     state(loop).phase = 'ALL_CLEAR';
     state(loop).phaseTimer = 0;
+    // 帰還シーンは終わったが暗転フェードアウトの最中はまだ ALL_CLEAR のまま
     tickFor(loop, ENDING_DURATION + 0.1);
+    expect(state(loop).phase).toBe('ALL_CLEAR');
+    // フェードアウト完了後にタイトルへ戻る
+    tickFor(loop, ENDING_FADEOUT_DURATION);
     expect(state(loop).phase).toBe('TITLE');
   });
 });
@@ -304,7 +308,7 @@ describe('GameLoop – story parts collection', () => {
     state(loop).phase = 'ALL_CLEAR';
     state(loop).phaseTimer = 0;
     state(loop).partsCollected = 3;
-    tickFor(loop, ENDING_DURATION + 0.1); // ALL_CLEAR → TITLE (createInitialState)
+    tickFor(loop, ENDING_DURATION + ENDING_FADEOUT_DURATION + 0.1); // ALL_CLEAR →(暗転)→ TITLE (createInitialState)
     expect(state(loop).phase).toBe('TITLE');
     expect(state(loop).partsCollected).toBe(0);
   });

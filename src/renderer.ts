@@ -3,7 +3,7 @@ import {
   TILE_SIZE, CANVAS_WIDTH, CANVAS_HEIGHT, MAP_OFFSET_Y,
   COLORS, GHOST_COLORS, getFruitDef, TOTAL_PARTS,
   ENDING_WALK_START, ENDING_RAMP_TIME, ENDING_BOARD_TIME, ENDING_LIFTOFF_TIME,
-  ENDING_WARP_TIME, ENDING_EARTH_TIME, ENDING_DURATION,
+  ENDING_WARP_TIME, ENDING_EARTH_TIME, ENDING_DURATION, ENDING_FADEOUT_DURATION,
   ENDING_ROCKET_CX, ENDING_ROCKET_CY, ENDING_SHAKE_MAG, ENDING_WARP_FACTOR,
 } from './constants.js';
 import type { MapManager } from './map.js';
@@ -726,14 +726,33 @@ export class Renderer {
       return; // ctx.restore() は上で実行済み（冒頭 save の解放は1回のみ）
     }
 
-    // 段階G(ENDING_EARTH_TIME〜ENDING_DURATION): 帰還 — 青い地球が出現して接近。導線のみ表示
-    const local = (timer - ENDING_EARTH_TIME) / (ENDING_DURATION - ENDING_EARTH_TIME); // 0→1
+    // 段階G(ENDING_EARTH_TIME〜ENDING_DURATION): 帰還 — 青い地球が出現して接近＋GAME CLEARナレーション
+    const local = Math.min(1, (timer - ENDING_EARTH_TIME) / (ENDING_DURATION - ENDING_EARTH_TIME)); // 0→1(以降は1で固定)
     const earthCy = CANVAS_HEIGHT * 0.40;
     const earthR = TILE_SIZE * (1.6 + local * 5.4); // 接近で拡大
     const earthAlpha = Math.min(1, local / 0.3);    // 出現フェードイン
     this.drawEarth(cx, earthCy, earthR, earthAlpha, local);
+
+    // GAME CLEAR ナレーション（地球が見えてから順に浮かび上がる）
+    const clearReveal = Math.min(1, Math.max(0, (local - 0.3) / 0.2)); // 見出し
+    const lineReveal  = Math.min(1, Math.max(0, (local - 0.5) / 0.25)); // 本文
+    this.glowText('GAME CLEAR', cx, CANVAS_HEIGHT * 0.66,
+      `bold ${Math.round(TILE_SIZE * 1.5)}px monospace`, '#7DF0FF', 16, 'center', clearReveal);
+    this.glowText('地球に帰還できた', cx, CANVAS_HEIGHT * 0.745,
+      `${TILE_SIZE - 4}px monospace`, '#CFE6FF', 8, 'center', lineReveal);
     this.glowText('Press SPACE / Tap', cx, CANVAS_HEIGHT * 0.88,
       `${TILE_SIZE - 3}px monospace`, '#FFFFFF', 8, 'center', this.pulseAlpha() * earthAlpha);
+
+    // 段階H(ENDING_DURATION〜): 暗転フェードアウト。前景キャンバスを黒で覆い、背景の星空ごと暗くする。
+    // 完了後（ALL_CLEAR_DURATION 到達）に gameLoop がタイトルへ遷移する。
+    if (timer > ENDING_DURATION) {
+      const fade = Math.min(1, (timer - ENDING_DURATION) / ENDING_FADEOUT_DURATION);
+      ctx.save();
+      ctx.globalAlpha = fade;
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+      ctx.restore();
+    }
   }
 
   /** 指定座標に飛行士を描く（歩行/乗船演出用）。anim は歩行アニメ位相、alpha は表示濃度。 */
