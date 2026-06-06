@@ -2,7 +2,7 @@ import type { GameState, GhostState, Direction } from './types.js';
 import {
   TILE_SIZE, CANVAS_WIDTH, CANVAS_HEIGHT, MAP_OFFSET_Y,
   COLORS, GHOST_COLORS, getFruitDef, TOTAL_PARTS,
-  ENDING_WALK_START, ENDING_BOARD_TIME, ENDING_LIFTOFF_TIME,
+  ENDING_WALK_START, ENDING_RAMP_TIME, ENDING_BOARD_TIME, ENDING_LIFTOFF_TIME,
   ENDING_WARP_TIME, ENDING_EARTH_TIME, ENDING_DURATION,
   ENDING_ROCKET_CX, ENDING_ROCKET_CY, ENDING_SHAKE_MAG, ENDING_WARP_FACTOR,
 } from './constants.js';
@@ -15,9 +15,20 @@ import type { ParticleSystem } from './particles.js';
 import type { LaserManager } from './laser.js';
 
 export class Renderer {
+  // エンディングの大型シャトル胴体の半幅(px)。drawShuttle と shuttleRamp で共有。
+  private static readonly SHUTTLE_BODY_HALF = 34;
+
   // 青い地球(drawEarth)の陸地パッチ配置 [dx, dy, 半径比]。毎フレーム生成を避けて定数化。
   private static readonly EARTH_PATCHES: ReadonlyArray<readonly [number, number, number]> = [
     [-0.3, -0.1, 0.28], [0.25, 0.15, 0.22], [0.05, -0.4, 0.16], [-0.15, 0.4, 0.2],
+  ];
+  // 地球の雲 [基準dx, dy, 半径比]。approach でドリフトさせる。
+  private static readonly EARTH_CLOUDS: ReadonlyArray<readonly [number, number, number]> = [
+    [-0.5, -0.25, 0.3], [0.1, 0.05, 0.26], [0.45, -0.35, 0.2], [-0.2, 0.45, 0.24],
+  ];
+  // 地球の夜側の都市光 [dx, dy]（右下=夜側に集める）。
+  private static readonly EARTH_CITY_LIGHTS: ReadonlyArray<readonly [number, number]> = [
+    [0.4, 0.45], [0.55, 0.25], [0.3, 0.6], [0.6, 0.5], [0.45, 0.65], [0.25, 0.4],
   ];
 
   private ctx: CanvasRenderingContext2D;
@@ -616,23 +627,25 @@ export class Renderer {
   }
 
   /**
-   * エンディング(帰還シーン): 着陸 → 歩いて乗船 → 点火 → 発進 → ワープ → 青い地球へ帰還の6段階。
+   * エンディング(帰還シーン): 着陸 → タラップで乗船 → 点火 → 発進・上昇 → ワープ → 青い地球へ帰還の7段階。
    * timer(秒)だけを入力に決定論的に組み立てる。盤面マップは描かず、背景の星空のみを舞台にする。
+   * 主役の大型シャトルは drawShuttle で専用に描き起こす（旧 drawRocket の簡易図形は廃止）。
    * 段階境界は constants の ENDING_* と共有（gameLoop の音/パーティクル発火と一致）。
    */
   private drawEnding(timer: number): void {
     const ctx = this.ctx;
     const cx = CANVAS_WIDTH / 2;
 
-    // シーンのレイアウト基準（停泊位置・地表ライン・機体中心）。constants と一致させる。
-    const groundY = ENDING_ROCKET_CY;                  // 噴射口＝地表ライン
-    const shipX = ENDING_ROCKET_CX;                    // 停泊X
-    const shipParkCy = groundY - TILE_SIZE * 0.42;     // 停泊時の機体中心Y（噴射口が地表に来る）
-    const astroR = TILE_SIZE / 2;                      // 飛行士の描画半径
-    const astroStandY = groundY - astroR * 0.95;       // 足が地表に着く中心Y
-    const walkStartX = CANVAS_WIDTH * 0.18;            // 歩き出しX（左）
+    // シーンのレイアウト基準（constants と一致）。
+    const groundY = ENDING_ROCKET_CY;          // エンジン噴射口＝地表ライン
+    const shipX = ENDING_ROCKET_CX;            // 機体の中心X
+    const astroR = TILE_SIZE * 0.72;           // 飛行士の描画半径（視認性のためやや大きめ）
+    const walkStartX = CANVAS_WIDTH * 0.12;    // 歩き出しX（左端）
+    // タラップ（ハッチの扉が倒れて出来る）の地上端とハッチ枢軸（drawShuttle と同じ式で算出）。
+    const ramp = this.shuttleRamp(shipX, groundY);
+    const groundStandY = groundY - astroR * 0.92; // 平地で足が地表に着く中心Y
 
-    // 点火(C)・発進(D)段階は画面を揺らす。timer 駆動で決定論的に増減する。
+    // 点火(D)・発進(E)段階は画面を揺らす。timer 駆動で決定論的に増減する。
     ctx.save();
     let shake = 0;
     if (timer >= ENDING_BOARD_TIME && timer < ENDING_LIFTOFF_TIME) {
@@ -642,51 +655,69 @@ export class Renderer {
     }
     if (shake > 0) ctx.translate(Math.sin(timer * 53) * shake, Math.cos(timer * 61) * shake);
 
-    // 段階A(0〜ENDING_WALK_START): 着陸 — 地表＋停泊船＋飛行士をフェードイン
+    // 段階A(0〜ENDING_WALK_START): 着陸 — 地表＋着陸したシャトル＋飛行士をフェードイン
     if (timer < ENDING_WALK_START) {
       const fade = Math.min(1, timer / 0.6);
-      this.drawSurface(fade);
-      this.drawRocket(shipX, shipParkCy, 0);
-      this.drawAstronautAt(walkStartX, astroStandY, astroR, 'RIGHT', timer * 0.6, fade);
-      ctx.restore();
-      return;
-    }
-
-    // 段階B(ENDING_WALK_START〜ENDING_BOARD_TIME): 飛行士が船まで歩いて乗船
-    if (timer < ENDING_BOARD_TIME) {
-      const p = (timer - ENDING_WALK_START) / (ENDING_BOARD_TIME - ENDING_WALK_START); // 0→1
-      const ease = p * p * (3 - 2 * p); // smoothstep
-      const x = walkStartX + (shipX - walkStartX) * ease;
-      const fade = p > 0.85 ? Math.max(0, 1 - (p - 0.85) / 0.15) : 1; // ハッチへ消える
+      ctx.globalAlpha = fade;
       this.drawSurface(1);
-      this.drawRocket(shipX, shipParkCy, 0);
-      this.drawAstronautAt(x, astroStandY, astroR, 'RIGHT', timer * 3, fade);
+      this.drawShuttle(shipX, groundY, { t: timer, thrust: 0, open: 0, grounded: true });
+      this.drawAstronautAt(walkStartX, groundStandY, astroR, 'RIGHT', timer * 0.5, 1);
       ctx.restore();
       return;
     }
 
-    // 段階C(ENDING_BOARD_TIME〜ENDING_LIFTOFF_TIME): 点火 — スラスター炎が立ち上がる
+    // 段階B(ENDING_WALK_START〜ENDING_RAMP_TIME): 飛行士がタラップ下まで地上を歩く
+    if (timer < ENDING_RAMP_TIME) {
+      const p = (timer - ENDING_WALK_START) / (ENDING_RAMP_TIME - ENDING_WALK_START); // 0→1
+      const ease = p * p * (3 - 2 * p);
+      const x = walkStartX + (ramp.groundX - walkStartX) * ease;
+      this.drawSurface(1);
+      this.drawShuttle(shipX, groundY, { t: timer, thrust: 0, open: 0, grounded: true });
+      this.drawAstronautAt(x, groundStandY, astroR, 'RIGHT', timer * 3.2, 1);
+      ctx.restore();
+      return;
+    }
+
+    // 段階C(ENDING_RAMP_TIME〜ENDING_BOARD_TIME): ハッチが開きタラップを上り乗船 → ハッチ閉
+    if (timer < ENDING_BOARD_TIME) {
+      const cP = (timer - ENDING_RAMP_TIME) / (ENDING_BOARD_TIME - ENDING_RAMP_TIME); // 0→1
+      const open = cP < 0.8 ? Math.min(1, cP / 0.2) : Math.max(0, 1 - (cP - 0.8) / 0.2); // 開く→上る→閉じる
+      const ascend = Math.max(0, Math.min(1, (cP - 0.2) / 0.55)); // タラップ上昇 0→1
+      const fade = ascend > 0.85 ? Math.max(0, 1 - (ascend - 0.85) / 0.15) : 1; // ハッチへ吸い込まれる
+      const ax = ramp.groundX + (ramp.hingeX - ramp.groundX) * ascend;
+      const ay = ramp.groundY + (ramp.hingeY - ramp.groundY) * ascend - astroR * 0.5;
+      this.drawSurface(1);
+      this.drawShuttle(shipX, groundY, { t: timer, thrust: 0, open, grounded: true });
+      if (fade > 0) this.drawAstronautAt(ax, ay, astroR, 'RIGHT', timer * 3.2, fade);
+      ctx.restore();
+      return;
+    }
+
+    // 段階D(ENDING_BOARD_TIME〜ENDING_LIFTOFF_TIME): 点火 — 炎が立ち上がり地面が照り返す
     if (timer < ENDING_LIFTOFF_TIME) {
       const ignite = (timer - ENDING_BOARD_TIME) / (ENDING_LIFTOFF_TIME - ENDING_BOARD_TIME); // 0→1
       this.drawSurface(1);
-      this.drawRocket(shipX, shipParkCy, ignite * 0.6);
+      this.drawGroundGlow(shipX, groundY, ignite);
+      this.drawShuttle(shipX, groundY, { t: timer, thrust: ignite * 0.7, open: 0, grounded: true });
       ctx.restore();
       return;
     }
 
-    // 段階D(ENDING_LIFTOFF_TIME〜ENDING_WARP_TIME): 発進 — 上昇して画面外へ。地表は下へ退く
+    // 段階E(ENDING_LIFTOFF_TIME〜ENDING_WARP_TIME): 発進 — 加速しながら上昇し画面外へ。地表は退く
     if (timer < ENDING_WARP_TIME) {
-      const lift = (timer - ENDING_LIFTOFF_TIME) / (ENDING_WARP_TIME - ENDING_LIFTOFF_TIME); // 0→1
-      this.drawSurface(1 - lift);
-      const rocketY = shipParkCy - lift * (shipParkCy + 100); // 上方へ上昇し画面外へ
-      this.drawRocket(shipX, rocketY, 0.6 + lift * 0.4);
+      const p = (timer - ENDING_LIFTOFF_TIME) / (ENDING_WARP_TIME - ENDING_LIFTOFF_TIME); // 0→1
+      const lift = p * p; // 加速度的な上昇
+      this.drawSurface(1 - p);
+      this.drawGroundGlow(shipX, groundY, (1 - p) * 0.8);
+      const baseY = groundY - lift * (groundY + 260); // 上方へ上昇し画面外へ
+      this.drawShuttle(shipX, baseY, { t: timer, thrust: 1, open: 0, grounded: false });
       ctx.restore();
       return;
     }
 
     ctx.restore(); // 以降の段階はシェイクなし
 
-    // 段階E(ENDING_WARP_TIME〜ENDING_EARTH_TIME): ワープ — ストリーク加速→終盤で減速
+    // 段階F(ENDING_WARP_TIME〜ENDING_EARTH_TIME): ワープ — ストリーク加速→終盤で減速
     if (timer < ENDING_EARTH_TIME) {
       const p = (timer - ENDING_WARP_TIME) / (ENDING_EARTH_TIME - ENDING_WARP_TIME); // 0→1
       const intensity = p < 0.7 ? p / 0.7 : Math.max(0, 1 - (p - 0.7) / 0.3); // 立ち上がり→減速
@@ -694,18 +725,17 @@ export class Renderer {
       return; // ctx.restore() は上で実行済み（冒頭 save の解放は1回のみ）
     }
 
-    // 段階F(ENDING_EARTH_TIME〜ENDING_DURATION): 帰還 — 青い地球が出現して接近。導線のみ表示
+    // 段階G(ENDING_EARTH_TIME〜ENDING_DURATION): 帰還 — 青い地球が出現して接近。導線のみ表示
     const local = (timer - ENDING_EARTH_TIME) / (ENDING_DURATION - ENDING_EARTH_TIME); // 0→1
-    const earthCx = cx;
-    const earthCy = CANVAS_HEIGHT * 0.42;
-    const earthR = TILE_SIZE * (1.4 + local * 4.6); // 接近で拡大
+    const earthCy = CANVAS_HEIGHT * 0.40;
+    const earthR = TILE_SIZE * (1.6 + local * 5.4); // 接近で拡大
     const earthAlpha = Math.min(1, local / 0.3);    // 出現フェードイン
-    this.drawEarth(earthCx, earthCy, earthR, earthAlpha);
-    this.glowText('Press SPACE / Tap', cx, CANVAS_HEIGHT * 0.86,
+    this.drawEarth(cx, earthCy, earthR, earthAlpha, local);
+    this.glowText('Press SPACE / Tap', cx, CANVAS_HEIGHT * 0.88,
       `${TILE_SIZE - 3}px monospace`, '#FFFFFF', 8, 'center', this.pulseAlpha() * earthAlpha);
   }
 
-  /** 指定座標に飛行士を描く（歩行/待機演出用）。anim は歩行アニメ位相、alpha は表示濃度。 */
+  /** 指定座標に飛行士を描く（歩行/乗船演出用）。anim は歩行アニメ位相、alpha は表示濃度。 */
   private drawAstronautAt(x: number, y: number, r: number, dir: Direction, anim: number, alpha: number): void {
     const ctx = this.ctx;
     ctx.save();
@@ -715,7 +745,236 @@ export class Renderer {
     ctx.restore();
   }
 
-  /** 惑星の地表（画面下部のホライズン＋地面グラデ）。alpha で出現/退場を制御。 */
+  /** タラップ（ハッチの扉が倒れて出来る）の地上端とハッチ枢軸（canvas座標）。drawShuttle と式を共有。 */
+  private shuttleRamp(cx: number, baseY: number): { groundX: number; groundY: number; hingeX: number; hingeY: number } {
+    const bh = Renderer.SHUTTLE_BODY_HALF;
+    return {
+      groundX: cx - bh - 64, // 地上端（左下）
+      groundY: baseY,
+      hingeX: cx - bh + 2,   // ハッチ枢軸（機体左の乗降口）
+      hingeY: baseY - 52,
+    };
+  }
+
+  /**
+   * 大型シャトルを専用に描き起こす。原点(cx, baseY)＝エンジン噴射口（接地時は地表ライン）。
+   * 上方向(負のy)へ機体を積み上げる。opts: t=時刻(炎のゆらぎ), thrust=噴射(0..1),
+   * open=ハッチ/タラップ展開(0..1), grounded=着陸脚とタラップを描くか。
+   */
+  private drawShuttle(cx: number, baseY: number, o: { t: number; thrust: number; open: number; grounded: boolean }): void {
+    const ctx = this.ctx;
+    const bh = Renderer.SHUTTLE_BODY_HALF; // 胴体の半幅
+    const bodyTop = baseY - 150;           // 胴体上端
+    const noseTip = baseY - 206;           // ノーズ先端
+
+    // --- スラスター炎（メイン＋ブースター）。最背面に加算合成で ---
+    if (o.thrust > 0) {
+      this.drawThrusterFlame(cx, baseY, o.thrust, 18, o.t);
+      for (const s of [-1, 1]) this.drawThrusterFlame(cx + s * (bh + 12), baseY - 2, o.thrust * 0.7, 10, o.t);
+    }
+
+    // --- 着陸脚（接地時のみ。胴体より後ろに先に描く） ---
+    if (o.grounded) {
+      ctx.save();
+      ctx.strokeStyle = '#6E7C99';
+      ctx.lineWidth = 4;
+      ctx.lineCap = 'round';
+      for (const s of [-1, 1]) {
+        ctx.beginPath();
+        ctx.moveTo(cx + s * (bh - 8), baseY - 26);
+        ctx.lineTo(cx + s * (bh + 24), baseY + 1);
+        ctx.stroke();
+        ctx.fillStyle = '#8893AE';
+        ctx.beginPath();
+        ctx.ellipse(cx + s * (bh + 24), baseY + 2, 7, 3, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    // --- サイドブースター（左右） ---
+    for (const s of [-1, 1]) {
+      const bx = cx + s * (bh + 12);
+      const g = ctx.createLinearGradient(bx - 12, 0, bx + 12, 0);
+      g.addColorStop(0, '#2A3650'); g.addColorStop(0.5, '#7C8BB0'); g.addColorStop(1, '#2A3650');
+      ctx.fillStyle = g;
+      this.roundRectPath(bx - 11, baseY - 122, 22, 118, 9);
+      ctx.fill();
+      ctx.fillStyle = '#C24A3A'; // ブースター・ノーズ
+      ctx.beginPath();
+      ctx.moveTo(bx - 11, baseY - 122);
+      ctx.quadraticCurveTo(bx, baseY - 146, bx + 11, baseY - 122);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    // --- エンジンベル ---
+    ctx.fillStyle = '#39435C';
+    ctx.beginPath();
+    ctx.moveTo(cx - 20, baseY - 16);
+    ctx.lineTo(cx + 20, baseY - 16);
+    ctx.lineTo(cx + 28, baseY + 2);
+    ctx.lineTo(cx - 28, baseY + 2);
+    ctx.closePath();
+    ctx.fill();
+
+    // --- 胴体（金属シリンダーの陰影：左明・右暗） ---
+    const body = ctx.createLinearGradient(cx - bh, 0, cx + bh, 0);
+    body.addColorStop(0, '#7E8CAC');
+    body.addColorStop(0.35, '#EAF1FF');
+    body.addColorStop(0.6, '#AEBBD6');
+    body.addColorStop(1, '#4A567A');
+    ctx.fillStyle = body;
+    this.roundRectPath(cx - bh, bodyTop, bh * 2, baseY - 8 - bodyTop, 10);
+    ctx.fill();
+
+    // パネルライン（横方向の継ぎ目）
+    ctx.strokeStyle = 'rgba(40,54,84,0.5)';
+    ctx.lineWidth = 1;
+    for (const yy of [bodyTop + 34, bodyTop + 78, bodyTop + 118]) {
+      ctx.beginPath();
+      ctx.moveTo(cx - bh + 3, yy);
+      ctx.lineTo(cx + bh - 3, yy);
+      ctx.stroke();
+    }
+    // 機体ストライプ（アクセント）
+    ctx.fillStyle = '#E0563E';
+    ctx.fillRect(cx - bh, bodyTop + 44, bh * 2, 8);
+
+    // --- ノーズコーン ---
+    const nose = ctx.createLinearGradient(cx - bh, bodyTop, cx + bh, bodyTop);
+    nose.addColorStop(0, '#E0563E'); nose.addColorStop(0.5, '#FF8A5A'); nose.addColorStop(1, '#B23A2C');
+    ctx.fillStyle = nose;
+    ctx.beginPath();
+    ctx.moveTo(cx - bh, bodyTop + 2);
+    ctx.quadraticCurveTo(cx - bh * 0.6, noseTip + 10, cx, noseTip);
+    ctx.quadraticCurveTo(cx + bh * 0.6, noseTip + 10, cx + bh, bodyTop + 2);
+    ctx.closePath();
+    ctx.fill();
+    // ノーズ基部の白帯
+    ctx.fillStyle = '#F4F8FF';
+    ctx.fillRect(cx - bh, bodyTop - 2, bh * 2, 5);
+
+    // --- コックピット窓（発光）＋舷窓 ---
+    ctx.save();
+    ctx.shadowColor = COLORS.SHIP_COCKPIT;
+    ctx.shadowBlur = 10;
+    ctx.fillStyle = COLORS.SHIP_COCKPIT;
+    ctx.beginPath();
+    ctx.arc(cx, bodyTop + 22, 9, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 6;
+    for (const yy of [bodyTop + 70, bodyTop + 98]) {
+      ctx.beginPath();
+      ctx.arc(cx + bh * 0.42, yy, 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+    // 窓ハイライト
+    ctx.fillStyle = 'rgba(255,255,255,0.8)';
+    ctx.beginPath();
+    ctx.arc(cx - 3, bodyTop + 19, 2.4, 0, Math.PI * 2);
+    ctx.fill();
+
+    // --- ハッチ／タラップ（接地時。open で扉が倒れてタラップになる） ---
+    if (o.grounded) {
+      const r = this.shuttleRamp(cx, baseY);
+      const sillX = cx - bh + 1, sillTop = baseY - 78, sillBot = baseY - 40;
+      if (o.open > 0) {
+        // 開口部（暗い船内）
+        ctx.fillStyle = '#0B1020';
+        this.roundRectPath(sillX, sillTop, 13, sillBot - sillTop, 3);
+        ctx.fill();
+        ctx.fillStyle = 'rgba(125,240,255,0.25)'; // 内側のほの光
+        ctx.fillRect(sillX + 2, sillTop + 3, 4, sillBot - sillTop - 6);
+        // タラップ（枢軸から地上端へ。open で倒れていく）
+        const ex = r.hingeX + (r.groundX - r.hingeX) * o.open;
+        const ey = r.hingeY + (r.groundY - r.hingeY) * o.open;
+        ctx.strokeStyle = '#9AA6C2';
+        ctx.lineWidth = 6;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(r.hingeX, r.hingeY);
+        ctx.lineTo(ex, ey);
+        ctx.stroke();
+        if (o.open > 0.6) { // タラップの踏み板
+          ctx.strokeStyle = 'rgba(40,54,84,0.7)';
+          ctx.lineWidth = 1;
+          for (let k = 1; k < 5; k++) {
+            const tx = r.hingeX + (ex - r.hingeX) * (k / 5);
+            const ty = r.hingeY + (ey - r.hingeY) * (k / 5);
+            ctx.beginPath();
+            ctx.moveTo(tx - 3, ty - 3);
+            ctx.lineTo(tx + 3, ty + 3);
+            ctx.stroke();
+          }
+        }
+      } else {
+        // 閉じたハッチ（少し凹んだパネル＋輪郭）
+        ctx.fillStyle = '#9CA9C6';
+        this.roundRectPath(sillX, sillTop, 13, sillBot - sillTop, 3);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(40,54,84,0.7)';
+        ctx.lineWidth = 1;
+        this.roundRectPath(sillX, sillTop, 13, sillBot - sillTop, 3);
+        ctx.stroke();
+      }
+    }
+  }
+
+  /** ロケット噴射の炎（加算合成）。baseY から下方向へ len 伸ばす。t で微小に揺らぐ。 */
+  private drawThrusterFlame(x: number, baseY: number, intensity: number, halfW: number, t: number): void {
+    if (intensity <= 0) return;
+    const ctx = this.ctx;
+    const flick = 0.9 + 0.1 * Math.sin(t * 40 + x);
+    const len = (28 + intensity * 150) * flick;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    // 外炎（オレンジ）
+    const g = ctx.createLinearGradient(0, baseY, 0, baseY + len);
+    g.addColorStop(0, 'rgba(255,236,170,0.95)');
+    g.addColorStop(0.3, COLORS.SHIP_THRUSTER);
+    g.addColorStop(1, 'rgba(255,90,40,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(x - halfW, baseY);
+    ctx.lineTo(x + halfW, baseY);
+    ctx.lineTo(x + halfW * 0.3, baseY + len);
+    ctx.lineTo(x - halfW * 0.3, baseY + len);
+    ctx.closePath();
+    ctx.fill();
+    // 内炎（白熱コア）
+    const g2 = ctx.createLinearGradient(0, baseY, 0, baseY + len * 0.55);
+    g2.addColorStop(0, 'rgba(255,255,255,0.95)');
+    g2.addColorStop(1, 'rgba(255,214,130,0)');
+    ctx.fillStyle = g2;
+    ctx.beginPath();
+    ctx.moveTo(x - halfW * 0.45, baseY);
+    ctx.lineTo(x + halfW * 0.45, baseY);
+    ctx.lineTo(x, baseY + len * 0.55);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
+  /** 噴射が地面を照らす照り返し（点火・発進時）。intensity(0..1)。 */
+  private drawGroundGlow(x: number, y: number, intensity: number): void {
+    if (intensity <= 0) return;
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const r = 40 + intensity * 90;
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, `rgba(255,180,90,${0.5 * intensity})`);
+    g.addColorStop(1, 'rgba(255,120,50,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.ellipse(x, y, r, r * 0.4, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  /** 惑星の地表（画面下部のホライズン＋地面グラデ＋遠景の稜線）。alpha で出現/退場を制御。 */
   private drawSurface(alpha: number): void {
     if (alpha <= 0) return;
     const ctx = this.ctx;
@@ -730,6 +989,19 @@ export class Renderer {
     ctx.fillStyle = grad;
     ctx.fillRect(0, groundY, CANVAS_WIDTH, CANVAS_HEIGHT - groundY);
 
+    // 遠景の稜線（決定論的な低い起伏）
+    ctx.fillStyle = 'rgba(20,40,62,0.8)';
+    ctx.beginPath();
+    ctx.moveTo(0, groundY);
+    for (let i = 0; i <= 8; i++) {
+      const rx = (i / 8) * CANVAS_WIDTH;
+      const ry = groundY - 6 - Math.abs(Math.sin(i * 1.7)) * 14;
+      ctx.lineTo(rx, ry);
+    }
+    ctx.lineTo(CANVAS_WIDTH, groundY);
+    ctx.closePath();
+    ctx.fill();
+
     // ホライズンの発光ライン
     ctx.strokeStyle = COLORS.PLAYER;
     ctx.shadowColor = COLORS.PLAYER;
@@ -742,41 +1014,84 @@ export class Renderer {
     ctx.restore();
   }
 
-  /** 青い地球。大気グロー＋海陸の放射グラデ。alpha で出現フェードイン。 */
-  private drawEarth(cx: number, cy: number, r: number, alpha: number): void {
+  /**
+   * 青い地球。大気グロー＋海陸＋雲＋昼夜境界（夜側の灯り）。
+   * alpha で出現フェードイン、approach(0..1) で夜側の食い込み・雲の流れを進める。
+   */
+  private drawEarth(cx: number, cy: number, r: number, alpha: number, approach: number): void {
     if (alpha <= 0) return;
     const ctx = this.ctx;
     ctx.save();
     ctx.globalAlpha = alpha;
 
     // 大気グロー（加算合成でにじむ縁）
+    ctx.save();
     ctx.globalCompositeOperation = 'lighter';
-    const halo = ctx.createRadialGradient(cx, cy, r * 0.9, cx, cy, r * 1.35);
-    halo.addColorStop(0, 'rgba(120,200,255,0.45)');
+    const halo = ctx.createRadialGradient(cx, cy, r * 0.92, cx, cy, r * 1.4);
+    halo.addColorStop(0, 'rgba(120,200,255,0.5)');
     halo.addColorStop(1, 'rgba(120,200,255,0)');
     ctx.fillStyle = halo;
     ctx.beginPath();
-    ctx.arc(cx, cy, r * 1.35, 0, Math.PI * 2);
+    ctx.arc(cx, cy, r * 1.4, 0, Math.PI * 2);
     ctx.fill();
+    ctx.restore();
 
-    // 本体（左上から光が当たる海洋ブルーの球）
-    ctx.globalCompositeOperation = 'source-over';
+    // 以降は地球の円でクリップ（陸・雲・夜が球からはみ出さない）
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.clip();
+
+    // 本体（左上から光が当たる海洋ブルー）
     const body = ctx.createRadialGradient(cx - r * 0.35, cy - r * 0.35, r * 0.1, cx, cy, r);
-    body.addColorStop(0, '#9FD8FF');
+    body.addColorStop(0, '#AFE0FF');
     body.addColorStop(0.5, '#2E7CC4');
     body.addColorStop(1, '#0B2A4A');
     ctx.fillStyle = body;
-    ctx.beginPath();
-    ctx.arc(cx, cy, r, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
 
-    // 陸地（緑のパッチを数枚、決定論的に配置）
-    ctx.fillStyle = 'rgba(70,176,120,0.55)';
+    // 陸地
+    ctx.fillStyle = 'rgba(70,176,120,0.65)';
     for (const [dx, dy, pr] of Renderer.EARTH_PATCHES) {
       ctx.beginPath();
       ctx.ellipse(cx + dx * r, cy + dy * r, pr * r, pr * r * 0.7, dx, 0, Math.PI * 2);
       ctx.fill();
     }
+
+    // 雲（白い半透明の渦。approach でゆっくり流れる）
+    ctx.fillStyle = 'rgba(255,255,255,0.35)';
+    for (const [dx, dy, pr] of Renderer.EARTH_CLOUDS) {
+      const ox = ((dx + approach * 0.3 + 1.5) % 1.5) - 0.75; // 横へドリフト
+      ctx.beginPath();
+      ctx.ellipse(cx + ox * r, cy + dy * r, pr * r, pr * r * 0.45, 0.3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // 昼夜境界（右下を影に）＋夜側の都市光
+    const night = ctx.createRadialGradient(cx - r * 0.4, cy - r * 0.4, r * 0.5, cx + r * 0.6, cy + r * 0.6, r * 1.3);
+    night.addColorStop(0, 'rgba(0,0,0,0)');
+    night.addColorStop(0.6, 'rgba(0,0,0,0)');
+    night.addColorStop(1, 'rgba(2,6,16,0.85)');
+    ctx.fillStyle = night;
+    ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+    ctx.fillStyle = 'rgba(255,221,150,0.9)'; // 夜側の灯り
+    for (const [dx, dy] of Renderer.EARTH_CITY_LIGHTS) {
+      ctx.beginPath();
+      ctx.arc(cx + dx * r, cy + dy * r, 0.9, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore(); // クリップ解除
+
+    // 縁の大気リム（左上が明るい三日月状）
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.strokeStyle = 'rgba(180,225,255,0.6)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r - 1, Math.PI * 0.9, Math.PI * 1.9);
+    ctx.stroke();
+    ctx.restore();
+
     ctx.restore();
   }
 
@@ -801,56 +1116,6 @@ export class Renderer {
       ctx.lineTo(x, y + len);
       ctx.stroke();
     }
-    ctx.restore();
-  }
-
-  /** 簡易ロケット。lift(0..1) でスラスター炎を伸ばし上昇感を出す。 */
-  private drawRocket(cx: number, cy: number, lift: number): void {
-    const ctx = this.ctx;
-    const r = TILE_SIZE * 0.6;
-    ctx.save();
-    ctx.translate(cx, cy);
-
-    // スラスター炎（上昇中ほど長く明るく）
-    const flame = r * (0.6 + lift * 1.8);
-    const flameGrad = ctx.createLinearGradient(0, r * 0.7, 0, r * 0.7 + flame);
-    flameGrad.addColorStop(0, COLORS.SHIP_THRUSTER);
-    flameGrad.addColorStop(1, 'rgba(255,138,60,0)');
-    ctx.fillStyle = flameGrad;
-    ctx.beginPath();
-    ctx.moveTo(-r * 0.4, r * 0.7);
-    ctx.lineTo(r * 0.4, r * 0.7);
-    ctx.lineTo(0, r * 0.7 + flame);
-    ctx.closePath();
-    ctx.fill();
-
-    // 機体（ハル）
-    ctx.fillStyle = COLORS.PLAYER;
-    ctx.beginPath();
-    ctx.moveTo(0, -r);
-    ctx.quadraticCurveTo(r * 0.7, -r * 0.2, r * 0.5, r * 0.7);
-    ctx.lineTo(-r * 0.5, r * 0.7);
-    ctx.quadraticCurveTo(-r * 0.7, -r * 0.2, 0, -r);
-    ctx.closePath();
-    ctx.fill();
-
-    // フィン
-    ctx.fillStyle = COLORS.SHIP_THRUSTER;
-    for (const side of [-1, 1]) {
-      ctx.beginPath();
-      ctx.moveTo(side * r * 0.5, r * 0.3);
-      ctx.lineTo(side * r * 0.85, r * 0.75);
-      ctx.lineTo(side * r * 0.5, r * 0.75);
-      ctx.closePath();
-      ctx.fill();
-    }
-
-    // コックピット
-    ctx.fillStyle = COLORS.SHIP_COCKPIT;
-    ctx.beginPath();
-    ctx.arc(0, -r * 0.15, r * 0.28, 0, Math.PI * 2);
-    ctx.fill();
-
     ctx.restore();
   }
 

@@ -9,8 +9,8 @@ import { AudioManager } from '../../src/audio.js';
 import { StorageManager } from '../../src/storage.js';
 import {
   COLS, ROWS,
-  ENDING_DURATION, ENDING_WALK_START, ENDING_BOARD_TIME, ENDING_LIFTOFF_TIME,
-  ENDING_WARP_TIME, ENDING_EARTH_TIME,
+  ENDING_DURATION, ENDING_WALK_START, ENDING_RAMP_TIME, ENDING_BOARD_TIME,
+  ENDING_LIFTOFF_TIME, ENDING_WARP_TIME, ENDING_EARTH_TIME,
 } from '../../src/constants.js';
 
 // Minimal Renderer stub that satisfies the type without touching Canvas
@@ -343,13 +343,14 @@ describe('GameLoop – ending stage cues', () => {
     return calls.filter((c) => c[0] === key).length;
   }
 
-  it('fires REPAIR_DONE / LIFTOFF / FANFARE exactly once over the full ending', () => {
+  it('fires HATCH / REPAIR_DONE / LIFTOFF / FANFARE exactly once over the full ending', () => {
     const { loop, audio } = makeGameLoop();
     state(loop).phase = 'ALL_CLEAR';
     state(loop).phaseTimer = 0;
 
     tickFor(loop, ENDING_DURATION + 0.1);
 
+    expect(playCount(audio, 'HATCH')).toBe(1);
     expect(playCount(audio, 'REPAIR_DONE')).toBe(1);
     expect(playCount(audio, 'LIFTOFF')).toBe(1);
     expect(playCount(audio, 'FANFARE')).toBe(1);
@@ -401,6 +402,16 @@ describe('GameLoop – ending stage cues', () => {
     expect(particles.activeCount()).toBeGreaterThan(0);
   });
 
+  it('fires HATCH (hatch open) on crossing the ramp boundary and not before', () => {
+    const { loop, audio } = makeGameLoop();
+    state(loop).phase = 'ALL_CLEAR';
+    state(loop).phaseTimer = ENDING_RAMP_TIME - 0.01;
+
+    expect(playCount(audio, 'HATCH')).toBe(0);
+    tickFor(loop, 1 / 60); // ハッチ開放境界をまたぐ
+    expect(playCount(audio, 'HATCH')).toBe(1);
+  });
+
   it('fires REPAIR_DONE (boarding) on crossing the board boundary and not before', () => {
     const { loop, audio } = makeGameLoop();
     state(loop).phase = 'ALL_CLEAR';
@@ -423,7 +434,8 @@ describe('GameLoop – ending stage cues', () => {
 
   // 段階境界が想定どおり昇順で並ぶことを保証（演出が途中で切れないための前提）
   it('keeps ending boundaries strictly ordered within the duration', () => {
-    expect(ENDING_WALK_START).toBeLessThan(ENDING_BOARD_TIME);
+    expect(ENDING_WALK_START).toBeLessThan(ENDING_RAMP_TIME);
+    expect(ENDING_RAMP_TIME).toBeLessThan(ENDING_BOARD_TIME);
     expect(ENDING_BOARD_TIME).toBeLessThan(ENDING_LIFTOFF_TIME);
     expect(ENDING_LIFTOFF_TIME).toBeLessThan(ENDING_WARP_TIME);
     expect(ENDING_WARP_TIME).toBeLessThan(ENDING_EARTH_TIME);
