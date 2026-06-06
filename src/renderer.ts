@@ -1,8 +1,9 @@
 import type { GameState, GhostState, Direction } from './types.js';
 import {
-  TILE_SIZE, CANVAS_WIDTH, CANVAS_HEIGHT,
+  TILE_SIZE, CANVAS_WIDTH, CANVAS_HEIGHT, MAP_OFFSET_Y,
   COLORS, GHOST_COLORS, getFruitDef, TOTAL_PARTS,
-  ENDING_REPAIR_DONE_TIME, ENDING_LIFTOFF_TIME, ENDING_DURATION,
+  ENDING_REPAIR_DONE_TIME, ENDING_LIFTOFF_TIME, ENDING_EPILOGUE_TIME,
+  ENDING_SHAKE_MAG, ENDING_WARP_FACTOR,
 } from './constants.js';
 import type { MapManager } from './map.js';
 import type { PlayerManager } from './player.js';
@@ -12,13 +13,11 @@ import { Starfield } from './background.js';
 import type { ParticleSystem } from './particles.js';
 import type { LaserManager } from './laser.js';
 
-const UI_HEIGHT = 4 * TILE_SIZE;
-const MAP_OFFSET_Y = UI_HEIGHT;
-
 export class Renderer {
   private ctx: CanvasRenderingContext2D;
   private bgCtx: CanvasRenderingContext2D | null = null;
   private starfield = new Starfield();
+  private lastBgTime: number | null = null; // 背景スクロールのフレーム差分算出用（初回は null）
 
   constructor(canvas: HTMLCanvasElement, bgCanvas?: HTMLCanvasElement) {
     canvas.width = CANVAS_WIDTH;
@@ -54,7 +53,14 @@ export class Renderer {
 
     // 全画面背景（星空・星雲・視差）。別キャンバスに描画して余白を埋める。
     if (this.bgCtx) {
-      this.starfield.draw(this.bgCtx, performance.now());
+      const now = performance.now();
+      const dtMs = this.lastBgTime !== null ? Math.min(now - this.lastBgTime, 100) : 16.7;
+      this.lastBgTime = now;
+      // エンディングの発進段階だけ星を加速させ「ワープ感」を出す
+      const warping = state.phase === 'ALL_CLEAR'
+        && state.phaseTimer >= ENDING_LIFTOFF_TIME && state.phaseTimer < ENDING_EPILOGUE_TIME;
+      this.starfield.setWarp(warping ? ENDING_WARP_FACTOR : 1);
+      this.starfield.draw(this.bgCtx, dtMs);
     }
 
     // 盤面キャンバスは透明クリア（背後の星空が通路の隙間から透ける）
@@ -604,37 +610,110 @@ export class Renderer {
     this.glowText('Press SPACE / Tap', cx, cy + 96, `${TILE_SIZE - 3}px monospace`, '#FFFFFF', 8, 'center', this.pulseAlpha() * fade);
   }
 
-  /** エンディング: 全部品回収 → 修理 → 発進の演出。timer(秒)で段階的に進む。 */
+  /**
+   * エンディング: 全部品回収 → 修理 → 発進 → エピローグの4段階演出。timer(秒)で進む。
+   * 段階境界は constants の ENDING_* と共有（gameLoop の音/パーティクル発火と一致）。
+   */
   private drawEnding(timer: number, parts: number): void {
     const cx = CANVAS_WIDTH / 2;
     const cy = CANVAS_HEIGHT / 2;
-    this.drawPanel(cy, 120);
+    const ctx = this.ctx;
+
+    // 発進段階(C)は画面全体を揺らす。timer 駆動で決定論的に減衰する。
+    ctx.save();
+    if (timer >= ENDING_LIFTOFF_TIME && timer < ENDING_EPILOGUE_TIME) {
+      const p = (timer - ENDING_LIFTOFF_TIME) / (ENDING_EPILOGUE_TIME - ENDING_LIFTOFF_TIME); // 0→1
+      const mag = ENDING_SHAKE_MAG * (1 - p); // 発進直後が最大、終盤で収束
+      ctx.translate(Math.sin(timer * 53) * mag, Math.cos(timer * 61) * mag);
+    }
 
     // 段階A(0〜ENDING_REPAIR_DONE_TIME): 回収完了 → 修理開始
     if (timer < ENDING_REPAIR_DONE_TIME) {
+      this.drawPanel(cy, 120);
       const k = Math.min(1, timer / 0.4);
       this.glowText('全部品 回収完了', cx, cy - 40, `bold ${TILE_SIZE + 4}px monospace`, '#7DF0FF', 14, 'center', k);
       this.glowText(`◇ ${parts}/${TOTAL_PARTS} ◇`, cx, cy - 6, `${TILE_SIZE}px monospace`, COLORS.POWER_DOT, 8, 'center', k);
       this.glowText('宇宙船を 修理中...', cx, cy + 34, `${TILE_SIZE - 4}px monospace`, '#9FD0FF', 6, 'center', this.pulseAlpha());
+      ctx.restore();
       return;
     }
 
     // 段階B(ENDING_REPAIR_DONE_TIME〜ENDING_LIFTOFF_TIME): システム復旧（グロー脈動）
     if (timer < ENDING_LIFTOFF_TIME) {
+      this.drawPanel(cy, 120);
       const pulse = 0.6 + 0.4 * Math.sin((timer - ENDING_REPAIR_DONE_TIME) * 6);
       this.glowText('修理 完了', cx, cy - 34, `bold ${TILE_SIZE + 4}px monospace`, '#46F0D8', 16, 'center', 1);
       this.glowText('システム オールグリーン', cx, cy + 6, `${TILE_SIZE - 5}px monospace`, '#2BE0A8', 8, 'center', pulse);
       this.drawRocket(cx, cy + 56, 0); // 発進前の機体
+      ctx.restore();
       return;
     }
 
-    // 段階C(ENDING_LIFTOFF_TIME〜ENDING_DURATION): 発進
-    const lift = (timer - ENDING_LIFTOFF_TIME) / (ENDING_DURATION - ENDING_LIFTOFF_TIME); // 0→1
-    const rocketY = cy + 56 - lift * (cy + 120); // 画面上方へ上昇
-    this.drawRocket(cx, rocketY, lift);
-    this.glowText('発進！', cx, cy - 30, `bold ${TILE_SIZE * 2}px monospace`, '#7DF0FF', 18, 'center', Math.min(1, lift * 2));
-    this.glowText('RESCUE COMPLETE', cx, cy + 4, `${TILE_SIZE - 4}px monospace`, '#FFE66D', 8, 'center', Math.min(1, lift * 2));
-    this.glowText('Press SPACE / Tap', cx, cy + 40, `${TILE_SIZE - 3}px monospace`, '#FFFFFF', 8, 'center', this.pulseAlpha());
+    // 段階C(ENDING_LIFTOFF_TIME〜ENDING_EPILOGUE_TIME): 発進（ワープライン＋上昇）
+    if (timer < ENDING_EPILOGUE_TIME) {
+      const lift = (timer - ENDING_LIFTOFF_TIME) / (ENDING_EPILOGUE_TIME - ENDING_LIFTOFF_TIME); // 0→1
+      this.drawWarpLines(lift);
+      const rocketY = cy + 56 - lift * (cy + 120); // 画面上方へ上昇し画面外へ
+      this.drawRocket(cx, rocketY, lift);
+      this.glowText('発進！', cx, cy - 30, `bold ${TILE_SIZE * 2}px monospace`, '#7DF0FF', 18, 'center', Math.min(1, lift * 2));
+      ctx.restore();
+      return;
+    }
+
+    // 段階D(ENDING_EPILOGUE_TIME〜ENDING_DURATION): 帰還エピローグ
+    ctx.restore(); // この段階はシェイクなし
+    this.drawEndingEpilogue(timer);
+  }
+
+  /** 発進段階のワープ演出。上方向へ流れる白ストリークを加算合成で重ねる。progress(0..1)で伸長。 */
+  private drawWarpLines(progress: number): void {
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const count = 24;
+    const len = 24 + progress * 120;
+    for (let i = 0; i < count; i++) {
+      // 決定論的な疑似ランダム（GLSL風ハッシュ）で水平位置と初期位相を決める
+      const hx = Math.abs(Math.sin(i * 12.9898) * 43758.5453) % 1;
+      const hp = Math.abs(Math.sin(i * 78.233) * 43758.5453) % 1;
+      const x = hx * CANVAS_WIDTH;
+      const phase = (hp + progress * 2) % 1;     // 上方向へ流れる
+      const y = (1 - phase) * CANVAS_HEIGHT;
+      ctx.strokeStyle = `rgba(180,224,255,${0.2 + 0.5 * progress})`;
+      ctx.lineWidth = 1 + hx;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x, y + len);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  /** 帰還エピローグ。物語の締めテキストを1行ずつ reveal し、最後に開始導線を出す。 */
+  private drawEndingEpilogue(timer: number): void {
+    const cx = CANVAS_WIDTH / 2;
+    const cy = CANVAS_HEIGHT / 2;
+    const local = timer - ENDING_EPILOGUE_TIME; // 0→(ENDING_DURATION-ENDING_EPILOGUE_TIME)
+
+    this.drawPanel(cy, 130);
+    this.glowText('RESCUE COMPLETE', cx, cy - 74, `bold ${TILE_SIZE + 2}px monospace`, '#FFE66D', 14, 'center', Math.min(1, local / 0.4));
+
+    const lines = [
+      'きみは深宇宙を越え',
+      '故郷の空へ還ってきた',
+      '',
+      'ありがとう、宇宙飛行士',
+    ];
+    const lineH = TILE_SIZE - 2;
+    const startY = cy - 34;
+    for (let i = 0; i < lines.length; i++) {
+      const text = lines[i];
+      if (!text) continue;
+      const reveal = Math.min(1, Math.max(0, (local - 0.4 - i * 0.35) / 0.4));
+      this.glowText(text, cx, startY + i * lineH, `${TILE_SIZE - 6}px monospace`, '#CFE6FF', 5, 'center', reveal);
+    }
+
+    this.glowText('Press SPACE / Tap', cx, cy + 92, `${TILE_SIZE - 3}px monospace`, '#FFFFFF', 8, 'center', this.pulseAlpha());
   }
 
   /** 簡易ロケット。lift(0..1) でスラスター炎を伸ばし上昇感を出す。 */

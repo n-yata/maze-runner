@@ -1,5 +1,9 @@
 import type { GameState } from './types.js';
-import { INITIAL_LIVES, MAX_LEVEL, getLevelParams, COLORS, getFruitDef, ENDING_DURATION } from './constants.js';
+import {
+  INITIAL_LIVES, MAX_LEVEL, getLevelParams, COLORS, getFruitDef,
+  ENDING_DURATION, ENDING_REPAIR_DONE_TIME, ENDING_LIFTOFF_TIME, ENDING_EPILOGUE_TIME,
+  ENDING_ROCKET_CX, ENDING_ROCKET_CY, MAP_OFFSET_Y,
+} from './constants.js';
 import { ParticleSystem } from './particles.js';
 import { LaserManager } from './laser.js';
 import type { MapManager } from './map.js';
@@ -221,12 +225,15 @@ export class GameLoop {
         }
         break;
 
-      case 'ALL_CLEAR':
+      case 'ALL_CLEAR': {
+        const before = this.state.phaseTimer;
         this.state.phaseTimer += dt;
+        this.fireEndingCues(before, this.state.phaseTimer);
         if (this.state.phaseTimer >= ALL_CLEAR_DURATION) {
           this.state = this.createInitialState();
         }
         break;
+      }
 
       case 'GAME_OVER':
         this.state.phaseTimer += dt;
@@ -316,5 +323,35 @@ export class GameLoop {
     const ate = this.lastPowerDotCount > 0 && powerCount < this.lastPowerDotCount;
     this.lastPowerDotCount = powerCount;
     return ate;
+  }
+
+  /** 区間 [before, after) が境界 t をまたいだか（半開区間で同一境界の二重発火を防ぐ）。 */
+  private crossed(before: number, after: number, t: number): boolean {
+    return before < t && after >= t;
+  }
+
+  /**
+   * エンディングの段階境界をまたいだ瞬間に、音とパーティクルを1回ずつ発火する。
+   * パーティクルは盤面ローカル座標系（描画側で MAP_OFFSET_Y を加算）なので、
+   * canvas 座標の噴射原点から MAP_OFFSET_Y を引いて渡す。
+   */
+  private fireEndingCues(before: number, after: number): void {
+    const px = ENDING_ROCKET_CX;
+    const py = ENDING_ROCKET_CY - MAP_OFFSET_Y;
+
+    if (this.crossed(before, after, ENDING_REPAIR_DONE_TIME)) {
+      // 段階B 修理完了: 復旧音＋機体まわりの青緑スパーク
+      this.audio.play('REPAIR_DONE');
+      this.particles.spawnBurst(px, py - 56, COLORS.PLAYER, 16, 70);
+    }
+    if (this.crossed(before, after, ENDING_LIFTOFF_TIME)) {
+      // 段階C 発進: 轟音＋噴射口からのオレンジ大量バースト
+      this.audio.play('LIFTOFF');
+      this.particles.spawnBurst(px, py, COLORS.SHIP_THRUSTER, 40, 150);
+    }
+    if (this.crossed(before, after, ENDING_EPILOGUE_TIME)) {
+      // 段階D エピローグ: 帰還のファンファーレ
+      this.audio.play('FANFARE');
+    }
   }
 }

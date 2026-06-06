@@ -7,6 +7,10 @@ export const TILE_SIZE = 24;
 export const CANVAS_WIDTH = COLS * TILE_SIZE;
 export const CANVAS_HEIGHT = (ROWS + 4) * TILE_SIZE; // extra rows for score UI
 
+// スコアUIの高さと盤面の縦オフセット。renderer の描画と gameLoop の座標換算で共有する。
+export const UI_HEIGHT = 4 * TILE_SIZE;
+export const MAP_OFFSET_Y = UI_HEIGHT;
+
 export const PLAYER_SPEED = 5.5; // tiles per second
 export const GHOST_SPEED = 4.5;  // プレイヤー(5.5)より少し遅く
 
@@ -100,8 +104,15 @@ export const TOTAL_PARTS = MAX_LEVEL;
 // エンディング(ALL_CLEAR)演出の段階境界(秒)。gameLoop のフェーズ継続時間と
 // renderer の描画段階で共有し、両者がズレて演出が途中で切れるのを防ぐ。
 export const ENDING_REPAIR_DONE_TIME = 2.0; // 段階A(回収完了→修理中)の終了
-export const ENDING_LIFTOFF_TIME     = 3.5; // 段階B(修理完了)の終了＝発進開始
-export const ENDING_DURATION         = 5.0; // エンディング全体の長さ(=ALL_CLEAR継続時間)
+export const ENDING_LIFTOFF_TIME     = 4.0; // 段階B(修理完了)の終了＝発進開始
+export const ENDING_EPILOGUE_TIME    = 6.5; // 段階C(発進)の終了＝エピローグ開始
+export const ENDING_DURATION         = 9.0; // エンディング全体の長さ(=ALL_CLEAR継続時間)
+
+// エンディング演出パラメータ。drawEnding(renderer) と fireEndingCues(gameLoop) で共有。
+export const ENDING_ROCKET_CX  = CANVAS_WIDTH / 2;        // 噴射原点X(canvas座標)
+export const ENDING_ROCKET_CY  = CANVAS_HEIGHT / 2 + 56;  // 噴射口Y(canvas座標, 発進前の機体足元)
+export const ENDING_SHAKE_MAG  = 6;                       // 発進時の画面シェイク最大振幅(px)
+export const ENDING_WARP_FACTOR = 9;                      // 発進中の星のスクロール倍率(ワープ感)
 
 export const TUNNEL_COLS = [0, COLS - 1]; // x-column indices that are tunnels
 

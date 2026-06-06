@@ -7,7 +7,10 @@ import { FruitManager } from '../../src/fruit.js';
 import { InputManager } from '../../src/input.js';
 import { AudioManager } from '../../src/audio.js';
 import { StorageManager } from '../../src/storage.js';
-import { COLS, ROWS } from '../../src/constants.js';
+import {
+  COLS, ROWS,
+  ENDING_DURATION, ENDING_REPAIR_DONE_TIME, ENDING_LIFTOFF_TIME, ENDING_EPILOGUE_TIME,
+} from '../../src/constants.js';
 
 // Minimal Renderer stub that satisfies the type without touching Canvas
 class StubRenderer {
@@ -247,11 +250,11 @@ describe('GameLoop – phase transitions', () => {
     expect(state(loop).level).toBe(3);
   });
 
-  it('ALL_CLEAR → TITLE after 5 seconds', () => {
+  it('ALL_CLEAR → TITLE after ENDING_DURATION', () => {
     const { loop } = makeGameLoop();
     state(loop).phase = 'ALL_CLEAR';
     state(loop).phaseTimer = 0;
-    tickFor(loop, 5.1);
+    tickFor(loop, ENDING_DURATION + 0.1);
     expect(state(loop).phase).toBe('TITLE');
   });
 });
@@ -300,7 +303,7 @@ describe('GameLoop – story parts collection', () => {
     state(loop).phase = 'ALL_CLEAR';
     state(loop).phaseTimer = 0;
     state(loop).partsCollected = 3;
-    tickFor(loop, 5.1); // ALL_CLEAR → TITLE (createInitialState)
+    tickFor(loop, ENDING_DURATION + 0.1); // ALL_CLEAR → TITLE (createInitialState)
     expect(state(loop).phase).toBe('TITLE');
     expect(state(loop).partsCollected).toBe(0);
   });
@@ -325,5 +328,68 @@ describe('GameLoop – story parts collection', () => {
     onStart(); // TITLE → INTRO
     expect(state(loop).phase).toBe('INTRO');
     expect(state(loop).partsCollected).toBe(0);
+  });
+});
+
+describe('GameLoop – ending stage cues', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  // audio.play の特定キー呼び出し回数を数える
+  function playCount(audio: AudioManager, key: string): number {
+    const calls = (audio.play as unknown as { mock: { calls: unknown[][] } }).mock.calls;
+    return calls.filter((c) => c[0] === key).length;
+  }
+
+  it('fires REPAIR_DONE / LIFTOFF / FANFARE exactly once over the full ending', () => {
+    const { loop, audio } = makeGameLoop();
+    state(loop).phase = 'ALL_CLEAR';
+    state(loop).phaseTimer = 0;
+
+    tickFor(loop, ENDING_DURATION + 0.1);
+
+    expect(playCount(audio, 'REPAIR_DONE')).toBe(1);
+    expect(playCount(audio, 'LIFTOFF')).toBe(1);
+    expect(playCount(audio, 'FANFARE')).toBe(1);
+  });
+
+  it('does not fire a cue before its boundary, fires on the crossing frame, and never twice', () => {
+    const { loop, audio } = makeGameLoop();
+    state(loop).phase = 'ALL_CLEAR';
+    // 発進境界の直前に置く（1フレーム未満手前）
+    state(loop).phaseTimer = ENDING_LIFTOFF_TIME - 0.01;
+
+    // 境界より手前（修理完了）は既に過ぎていないので未発火
+    expect(playCount(audio, 'LIFTOFF')).toBe(0);
+
+    // 1フレームで境界をまたぐ → 発火
+    tickFor(loop, 1 / 60);
+    expect(playCount(audio, 'LIFTOFF')).toBe(1);
+
+    // さらに進めても二重発火しない
+    tickFor(loop, 0.5);
+    expect(playCount(audio, 'LIFTOFF')).toBe(1);
+  });
+
+  it('spawns liftoff particles when crossing the liftoff boundary', () => {
+    const { loop } = makeGameLoop();
+    const particles = (loop as unknown as {
+      particles: import('../../src/particles.js').ParticleSystem;
+    }).particles;
+    particles.clear();
+
+    state(loop).phase = 'ALL_CLEAR';
+    state(loop).phaseTimer = ENDING_LIFTOFF_TIME - 0.01;
+    tickFor(loop, 1 / 60); // 発進境界をまたぐ → 噴射バースト
+
+    expect(particles.activeCount()).toBeGreaterThan(0);
+  });
+
+  // 段階境界が想定どおり昇順で並ぶことを保証（演出が途中で切れないための前提）
+  it('keeps ending boundaries strictly ordered within the duration', () => {
+    expect(ENDING_REPAIR_DONE_TIME).toBeLessThan(ENDING_LIFTOFF_TIME);
+    expect(ENDING_LIFTOFF_TIME).toBeLessThan(ENDING_EPILOGUE_TIME);
+    expect(ENDING_EPILOGUE_TIME).toBeLessThan(ENDING_DURATION);
   });
 });

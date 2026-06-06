@@ -24,7 +24,10 @@ export type GamePhase =
   | 'ALL_CLEAR'
   | 'GAME_OVER';
 
-export type SoundKey = 'EAT_DOT' | 'EAT_POWER' | 'EAT_GHOST' | 'DEATH' | 'GAME_START' | 'EAT_FRUIT';
+export type SoundKey =
+  | 'EAT_DOT' | 'EAT_POWER' | 'EAT_GHOST' | 'DEATH' | 'GAME_START' | 'EAT_FRUIT'
+  // エンディング段階に同期する効果音
+  | 'REPAIR_DONE' | 'LIFTOFF' | 'FANFARE';
 
 export interface PlayerState {
   pos: Vec2;

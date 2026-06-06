@@ -14,6 +14,10 @@ const SOUND_DEFS: Record<SoundKey, SoundDef> = {
   DEATH:     { frequency: 110,  type: 'sawtooth',  duration: 1.0,  gainPeak: 0.5 },
   GAME_START:{ frequency: 523,  type: 'triangle', duration: 0.5,  gainPeak: 0.4 },
   EAT_FRUIT: { frequency: 660,  type: 'triangle', duration: 0.4,  gainPeak: 0.3 },
+  // エンディング段階の効果音
+  REPAIR_DONE:{ frequency: 784,  type: 'triangle', duration: 0.35, gainPeak: 0.35 }, // 修理完了(明るい復旧音)
+  LIFTOFF:    { frequency: 70,   type: 'sawtooth', duration: 0.7,  gainPeak: 0.5 },  // 発進(低い轟き)
+  FANFARE:    { frequency: 988,  type: 'triangle', duration: 0.6,  gainPeak: 0.4 },  // 帰還(勝利のファンファーレ)
 };
 
 export class AudioManager {

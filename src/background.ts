@@ -31,6 +31,15 @@ export class Starfield {
   private h = 0;
   private layers: Star[][] = [];
   private nebulae: Nebula[] = [];
+  // 内部経過時間(ms)とスクロール倍率。倍率を変えても位置が連続するよう、
+  // 絶対時刻ではなくフレーム差分を倍率付きで積算する（エンディングのワープ加速用）。
+  private elapsedMs = 0;
+  private warp = 1;
+
+  /** スクロール倍率を設定する。発進演出中だけ >1 にして星を加速させる。 */
+  setWarp(factor: number): void {
+    this.warp = factor;
+  }
 
   resize(w: number, h: number): void {
     this.w = Math.max(1, w);
@@ -73,9 +82,11 @@ export class Starfield {
     }
   }
 
-  draw(ctx: Ctx, timeMs: number): void {
+  /** フレーム差分 dtMs を倍率付きで積算して描画する。warp>1 でワープ加速。 */
+  draw(ctx: Ctx, dtMs: number): void {
+    this.elapsedMs += dtMs * this.warp;
     const { w, h } = this;
-    const t = timeMs / 1000;
+    const t = this.elapsedMs / 1000;
 
     // 深宇宙のベースグラデ
     const bg = ctx.createLinearGradient(0, 0, 0, h);
