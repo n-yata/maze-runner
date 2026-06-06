@@ -550,9 +550,10 @@ export class Renderer {
     ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
     ctx.restore();
 
-    // ロゴ下を横切る細い光のライン（スタイリッシュなアクセント）
+    // サブタイトル下を横切る細い光のライン（スタイリッシュなアクセント）
+    // サブタイトル「ステラー・ラン」(baseline cy+6) と重ならないよう、その下に配置する。
     const lineAlpha = 0.25 + 0.2 * Math.sin(t * 1.6);
-    this.glowText('━━━━━━━━', cx, cy + 6, `${TILE_SIZE}px monospace`, '#7DF0FF', 10, 'center', lineAlpha);
+    this.glowText('━━━━━━━━', cx, cy + 30, `${TILE_SIZE}px monospace`, '#7DF0FF', 10, 'center', lineAlpha);
 
     // ロゴ登場（最初の約0.6秒でフェードイン＋ポップイン: drawReady と同系の ease-out）
     const k = Math.min(1, timer / 0.6);
@@ -622,8 +623,8 @@ export class Renderer {
       this.glowText(text, cx, startY + i * lineH, `${TILE_SIZE - 6}px monospace`, '#CFE6FF', 5, 'center', reveal);
     }
 
-    // 開始導線
-    this.glowText('Press SPACE / Tap', cx, cy + 96, `${TILE_SIZE - 3}px monospace`, '#FFFFFF', 8, 'center', this.pulseAlpha() * fade);
+    // 開始導線（最終行「故郷へ還るんだ」が baseline cy+98 にあるため、その下へ離して配置）
+    this.glowText('Press SPACE / Tap', cx, cy + 120, `${TILE_SIZE - 3}px monospace`, '#FFFFFF', 8, 'center', this.pulseAlpha() * fade);
   }
 
   /**
