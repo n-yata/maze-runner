@@ -196,3 +196,55 @@ describe('MapManager - getValidFruitPositions', () => {
     }
   });
 });
+
+describe('MapManager - ボス闘技場 (resetBossArena)', () => {
+  let map: MapManager;
+  beforeEach(() => {
+    map = new MapManager();
+    map.resetBossArena();
+  });
+
+  it('外周は壁で囲まれている', () => {
+    for (let c = 0; c < COLS; c++) {
+      expect(map.isWall(c, 0)).toBe(true);
+      expect(map.isWall(c, ROWS - 1)).toBe(true);
+    }
+    for (let r = 0; r < ROWS; r++) {
+      expect(map.isWall(0, r)).toBe(true);
+      expect(map.isWall(COLS - 1, r)).toBe(true);
+    }
+  });
+
+  it('内部は開けている（レーザーが上方のボスへ遮蔽なく届くよう内部に壁を置かない）', () => {
+    for (let r = 1; r < ROWS - 1; r++) {
+      for (let c = 1; c < COLS - 1; c++) {
+        expect(map.isWall(c, r)).toBe(false);
+      }
+    }
+  });
+
+  it('プレイヤー初期位置から全通路へ到達できる（孤立がない）', () => {
+    const reachable = reachableTiles(map);
+    let passable = 0;
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        if (!map.isWall(c, r)) passable++;
+      }
+    }
+    expect(reachable.size).toBe(passable);
+  });
+
+  it('バリア供給源のパワーエサが配置されている', () => {
+    let power = 0;
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        if (map.isPowerDot(c, r)) power++;
+      }
+    }
+    expect(power).toBeGreaterThan(0);
+  });
+
+  it('フルーツ有効位置が非空（詰み防止の前提）', () => {
+    expect(map.getValidFruitPositions().length).toBeGreaterThan(0);
+  });
+});

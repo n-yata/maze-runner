@@ -11,7 +11,26 @@ import {
   COLS, ROWS,
   ENDING_DURATION, ENDING_FADEOUT_DURATION, ENDING_WALK_START, ENDING_RAMP_TIME, ENDING_BOARD_TIME,
   ENDING_LIFTOFF_TIME, ENDING_WARP_TIME, ENDING_EARTH_TIME,
+  BOSS_READY_DURATION, BOSS_DEFEATED_DURATION, BOSS_MAX_HP,
 } from '../../src/constants.js';
+import type { BossManager } from '../../src/boss.js';
+import type { Beam } from '../../src/laser.js';
+
+// GameLoop 内部の BossManager / bossActive へアクセスするヘルパー（テスト専用）
+function boss(loop: GameLoop): BossManager {
+  return (loop as unknown as { boss: BossManager }).boss;
+}
+function setBossActive(loop: GameLoop, active: boolean): void {
+  (loop as unknown as { bossActive: boolean }).bossActive = active;
+}
+/** ボス本体中心に当たるビームを n 本当ててHPを削る（テスト用の直接ダメージ）。 */
+function damageBoss(loop: GameLoop, hits: number): void {
+  const b = boss(loop);
+  const c = b.centerPixel;
+  const beams: Beam[] = [];
+  for (let i = 0; i < hits; i++) beams.push({ active: true, x: c.x, y: c.y, dx: 0, dy: -1 });
+  b.hitByBeams(beams);
+}
 
 // Minimal Renderer stub that satisfies the type without touching Canvas
 class StubRenderer {
@@ -241,13 +260,13 @@ describe('GameLoop – phase transitions', () => {
     expect(state(loop).level).toBe(2);
   });
 
-  it('STAGE_CLEAR → ALL_CLEAR when final level cleared', () => {
+  it('STAGE_CLEAR → BOSS_READY when final level cleared (boss stage before ending)', () => {
     const { loop } = makeGameLoop();
     state(loop).phase = 'STAGE_CLEAR';
     state(loop).phaseTimer = 0;
     state(loop).level = 3;
     tickFor(loop, 2.1);
-    expect(state(loop).phase).toBe('ALL_CLEAR');
+    expect(state(loop).phase).toBe('BOSS_READY');
     expect(state(loop).level).toBe(3);
   });
 
@@ -300,7 +319,8 @@ describe('GameLoop – story parts collection', () => {
     }
 
     expect(state(loop).partsCollected).toBe(3);
-    expect(state(loop).phase).toBe('ALL_CLEAR');
+    // ステージ3クリア後は帰還エンディングへ直行せず、最終関門のボス戦へ
+    expect(state(loop).phase).toBe('BOSS_READY');
   });
 
   it('resets parts to 0 when returning to TITLE after the ending', () => {
@@ -333,6 +353,128 @@ describe('GameLoop – story parts collection', () => {
     onStart(); // TITLE → INTRO
     expect(state(loop).phase).toBe('INTRO');
     expect(state(loop).partsCollected).toBe(0);
+  });
+});
+
+describe('GameLoop – boss stage', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it('STAGE_CLEAR(level 3) → BOSS_READY (not directly ALL_CLEAR)', () => {
+    const { loop } = makeGameLoop();
+    state(loop).phase = 'STAGE_CLEAR';
+    state(loop).phaseTimer = 0;
+    state(loop).level = 3;
+    tickFor(loop, 2.1);
+    expect(state(loop).phase).toBe('BOSS_READY');
+  });
+
+  it('BOSS_READY → BOSS after BOSS_READY_DURATION', () => {
+    const { loop } = makeGameLoop();
+    state(loop).phase = 'BOSS_READY';
+    state(loop).phaseTimer = 0;
+    tickFor(loop, BOSS_READY_DURATION + 0.1);
+    expect(state(loop).phase).toBe('BOSS');
+  });
+
+  it('stays in BOSS_READY before its duration elapses', () => {
+    const { loop } = makeGameLoop();
+    state(loop).phase = 'BOSS_READY';
+    state(loop).phaseTimer = 0;
+    tickFor(loop, BOSS_READY_DURATION - 0.5);
+    expect(state(loop).phase).toBe('BOSS_READY');
+  });
+
+  it('BOSS → PLAYER_DEAD when the player is hit', () => {
+    const { loop, player } = makeGameLoop();
+    state(loop).phase = 'BOSS';
+    setBossActive(loop, true);
+    player.die();
+    tickFor(loop, 1 / 60);
+    expect(state(loop).phase).toBe('PLAYER_DEAD');
+  });
+
+  it('BOSS → BOSS_DEFEATED when boss HP reaches 0', () => {
+    const { loop } = makeGameLoop();
+    state(loop).phase = 'BOSS';
+    setBossActive(loop, true);
+    damageBoss(loop, BOSS_MAX_HP); // HPを0にする
+    expect(boss(loop).isDefeated).toBe(true);
+    tickFor(loop, 1 / 60);
+    expect(state(loop).phase).toBe('BOSS_DEFEATED');
+  });
+
+  it('does NOT clear the boss stage while HP remains (no early clear)', () => {
+    const { loop } = makeGameLoop();
+    state(loop).phase = 'BOSS';
+    setBossActive(loop, true);
+    tickFor(loop, 1.0); // レーザーを当てていないのでHPは満タンのまま
+    expect(boss(loop).hp).toBeGreaterThan(0);
+    expect(state(loop).phase).not.toBe('BOSS_DEFEATED');
+  });
+
+  it('respawns into BOSS_READY with boss HP retained when a life remains', () => {
+    const { loop } = makeGameLoop();
+    setBossActive(loop, true);
+    damageBoss(loop, 5); // HP を 5 削る
+    const hpAfterDamage = boss(loop).hp;
+    expect(hpAfterDamage).toBe(BOSS_MAX_HP - 5);
+
+    state(loop).phase = 'PLAYER_DEAD';
+    state(loop).phaseTimer = 0;
+    state(loop).lives = 2;
+    tickFor(loop, 1.6);
+
+    expect(state(loop).phase).toBe('BOSS_READY');
+    expect(state(loop).lives).toBe(1);
+    expect(boss(loop).hp).toBe(hpAfterDamage); // 削った進捗は維持
+  });
+
+  it('PLAYER_DEAD(boss, no lives) → GAME_OVER', () => {
+    const { loop } = makeGameLoop();
+    setBossActive(loop, true);
+    state(loop).phase = 'PLAYER_DEAD';
+    state(loop).phaseTimer = 0;
+    state(loop).lives = 1;
+    tickFor(loop, 1.6);
+    expect(state(loop).phase).toBe('GAME_OVER');
+    expect(state(loop).lives).toBe(0);
+  });
+
+  it('BOSS_DEFEATED → ALL_CLEAR after BOSS_DEFEATED_DURATION (returns to ending)', () => {
+    const { loop } = makeGameLoop();
+    state(loop).phase = 'BOSS_DEFEATED';
+    state(loop).phaseTimer = 0;
+    setBossActive(loop, true);
+    tickFor(loop, BOSS_DEFEATED_DURATION + 0.1);
+    expect(state(loop).phase).toBe('ALL_CLEAR');
+  });
+
+  it('keeps partsCollected at 3 throughout the boss stage', () => {
+    const { loop } = makeGameLoop();
+    state(loop).phase = 'STAGE_CLEAR';
+    state(loop).phaseTimer = 0;
+    state(loop).level = 3;
+    state(loop).partsCollected = 3;
+    tickFor(loop, 2.1); // → BOSS_READY
+    expect(state(loop).phase).toBe('BOSS_READY');
+    expect(state(loop).partsCollected).toBe(3);
+    tickFor(loop, BOSS_READY_DURATION + 0.1); // → BOSS
+    expect(state(loop).partsCollected).toBe(3);
+  });
+
+  it('resets boss HP when returning to TITLE after the ending', () => {
+    const { loop } = makeGameLoop();
+    damageBoss(loop, 10);
+    expect(boss(loop).hp).toBe(BOSS_MAX_HP - 10);
+
+    state(loop).phase = 'ALL_CLEAR';
+    state(loop).phaseTimer = 0;
+    tickFor(loop, ENDING_DURATION + ENDING_FADEOUT_DURATION + 0.1);
+
+    expect(state(loop).phase).toBe('TITLE');
+    expect(boss(loop).hp).toBe(BOSS_MAX_HP); // createInitialState で初期化
   });
 });
 

@@ -1,5 +1,5 @@
 import type { Vec2, TileType } from './types.js';
-import { COLS, ROWS, TILE_SIZE, COLORS, getStageColors } from './constants.js';
+import { COLS, ROWS, TILE_SIZE, COLORS, getStageColors, BOSS_ARENA_COLORS } from './constants.js';
 
 // 0=EMPTY, 1=WALL, 2=DOT, 3=POWER_DOT, 4=TUNNEL
 //
@@ -92,6 +92,35 @@ function buildTiles(level: number): TileType[] {
   const power: Vec2[] = [
     { x: 1, y: 3 }, { x: COLS - 2, y: 3 },
     { x: 1, y: ROWS - 4 }, { x: COLS - 2, y: ROWS - 4 },
+  ];
+  for (const p of power) {
+    if (t[idx(p.x, p.y)] === 2) t[idx(p.x, p.y)] = 3;
+  }
+
+  return t.map(v => v as TileType);
+}
+
+// ボス闘技場のレイアウト。外周のみ壁で内部は開けた広間にする。
+// 迷路を置かない理由: レーザーは壁で消滅するため、上方のボスへ遮蔽なく届く必要がある。
+// プレイヤーは下部の広い空間を左右に動いて弾を避けつつ反撃する。
+// 下部の左右にパワーエサを置き、取りに動く＝避ける動線かつバリア(盾)の供給源とする。
+function buildBossArena(): TileType[] {
+  const t: number[] = new Array(COLS * ROWS).fill(2); // 全面ドット（スコア源＋フルーツ有効位置）
+  const idx = (c: number, r: number) => r * COLS + c;
+
+  // 外周ボーダーのみ壁
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      if (r === 0 || r === ROWS - 1 || c === 0 || c === COLS - 1) {
+        t[idx(c, r)] = 1;
+      }
+    }
+  }
+
+  // パワーエサ（バリア供給源）。下部の左右に配置し、取りに動く動線を作る。
+  const power: Vec2[] = [
+    { x: 2, y: ROWS - 4 }, { x: COLS - 3, y: ROWS - 4 },
+    { x: 2, y: ROWS - 8 }, { x: COLS - 3, y: ROWS - 8 },
   ];
   for (const p of power) {
     if (t[idx(p.x, p.y)] === 2) t[idx(p.x, p.y)] = 3;
@@ -317,6 +346,18 @@ export class MapManager {
     this.wallColor = colors.wall;
     this.wallInnerColor = colors.inner;
     this.wallGlowColor = colors.glow;
+    this.buildOffscreenCanvas();
+  }
+
+  /** ボス闘技場（外周のみ壁の開けた広間）へ盤面を再構築する。配色は最終決戦の赤系。 */
+  resetBossArena(): void {
+    this.tiles = buildBossArena();
+    this.dotState = this.tiles.map(t => t === 2 || t === 3);
+    this.totalDots = this.dotState.filter(Boolean).length;
+    this.recomputeCaches();
+    this.wallColor = BOSS_ARENA_COLORS.wall;
+    this.wallInnerColor = BOSS_ARENA_COLORS.inner;
+    this.wallGlowColor = BOSS_ARENA_COLORS.glow;
     this.buildOffscreenCanvas();
   }
 

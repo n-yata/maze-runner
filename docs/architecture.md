@@ -95,6 +95,7 @@ dist/
 ├── map.js
 ├── player.js
 ├── ghost.js
+├── boss.js         # ボスステージのHP・弾幕（固定長プール）・被弾判定（最終関門）
 ├── renderer.js
 ├── background.js   # 星空・星雲・視差（全画面背景、GameState非依存の純粋視覚）
 ├── particles.js    # 取得/撃破スパーク（固定プール）

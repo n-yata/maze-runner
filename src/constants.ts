@@ -210,3 +210,37 @@ export function getLevelParams(level: number): LevelParams {
   const clamped = Math.max(1, Math.min(level, LEVEL_PARAMS.length));
   return LEVEL_PARAMS[clamped - 1]!;
 }
+
+// =============================================================
+// ボスステージ（ステージ3クリア後の最終関門）
+// =============================================================
+// 全3面クリア後、帰還エンディング(ALL_CLEAR)へ直行せず、HP制の巨大ボスと
+// 一騎打ちする。ボスは盤面上部に陣取り弾幕を放ち、プレイヤーはレーザーで反撃し
+// 電磁バリアで被弾を防ぐ。撃破でALL_CLEARへ接続する。
+// MAX_LEVEL / TOTAL_PARTS は変更しない（level は3のまま・部品は3個のまま）。
+
+// フェーズ継続時間（gameLoop のフェーズ駆動と共有）
+export const BOSS_READY_DURATION    = 2.5; // WARNING導入の表示時間(秒)
+export const BOSS_DEFEATED_DURATION = 2.5; // 撃破演出→ALL_CLEAR への猶予(秒)
+
+// HP・ダメージ
+export const BOSS_MAX_HP      = 60;            // 初期HP。レーザー1ヒット=1ダメージ → 60ヒットで撃破
+export const BOSS_HIT_DAMAGE  = 1;             // レーザー1ヒットの与ダメ
+export const BOSS_BODY_RADIUS = TILE_SIZE * 1.6; // 本体の被弾円半径(px)。大きめで上方の的に当てやすく
+
+// 本体の挙動（盤面上部で左右往復）
+export const BOSS_CENTER_Y   = TILE_SIZE * 3.2;  // 本体中心Y(盤面ローカルpx)。盤面上部
+export const BOSS_SWAY_SPEED = 1.1;              // 左右往復の角速度(rad/秒)
+export const BOSS_SWAY_RANGE = TILE_SIZE * 4;    // 往復の片振幅(px)
+
+// 弾幕（2系統を別タイマーで合成・乱数なしの決定論）
+export const BOSS_BULLET_SPEED   = 6.0;          // 弾速(tiles/秒)。プレイヤー速度と同等で回避可能
+export const BOSS_BULLET_RADIUS  = TILE_SIZE * 0.34; // 弾の被弾半径(px)
+export const BOSS_FIRE_INTERVAL  = 0.9;          // ばら撒き(扇)ウェーブの発射間隔(秒)
+export const BOSS_SPREAD_COUNT   = 5;            // 1ウェーブの扇状弾数
+export const BOSS_SPREAD_ARC     = Math.PI * 0.5; // 扇の開き角(rad)。下方向中心
+export const BOSS_AIMED_INTERVAL = 1.8;          // 狙い撃ち弾の発射間隔(秒)
+export const BOSS_MAX_BULLETS    = 48;           // 弾プール上限(固定長)
+
+// ボス闘技場の配色（既存 STAGE_WALL_COLORS は変更しない。最終決戦の赤系）
+export const BOSS_ARENA_COLORS = { wall: '#C8273A', inner: '#300A12', glow: '#FF5C6E' } as const;

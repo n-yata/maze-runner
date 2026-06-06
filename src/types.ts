@@ -21,6 +21,9 @@ export type GamePhase =
   | 'PAUSED'
   | 'PLAYER_DEAD'
   | 'STAGE_CLEAR'
+  | 'BOSS_READY'    // ボス戦の導入(WARNING表示)
+  | 'BOSS'          // ボス戦本編(弾幕・HP制バトル)
+  | 'BOSS_DEFEATED' // ボス撃破演出(完了後にALL_CLEARへ)
   | 'ALL_CLEAR'
   | 'GAME_OVER';
 

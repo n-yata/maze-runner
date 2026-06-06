@@ -3,9 +3,11 @@ import {
   INITIAL_LIVES, MAX_LEVEL, getLevelParams, COLORS, getFruitDef,
   ENDING_DURATION, ENDING_FADEOUT_DURATION, ENDING_RAMP_TIME, ENDING_BOARD_TIME, ENDING_LIFTOFF_TIME, ENDING_EARTH_TIME,
   ENDING_ROCKET_CX, ENDING_ROCKET_CY, MAP_OFFSET_Y,
+  BOSS_READY_DURATION, BOSS_DEFEATED_DURATION,
 } from './constants.js';
 import { ParticleSystem } from './particles.js';
 import { LaserManager } from './laser.js';
+import { BossManager } from './boss.js';
 import type { MapManager } from './map.js';
 import type { PlayerManager } from './player.js';
 import type { GhostManager } from './ghost.js';
@@ -35,6 +37,8 @@ export class GameLoop {
   private lastPowerDotCount = -1;
   private particles = new ParticleSystem();
   private laser = new LaserManager();
+  private boss = new BossManager();
+  private bossActive = false; // ボス戦中か（リスポーン先の分岐に使う。PLAYER_DEAD でフェーズ名が消えるため別途保持）
   private readonly boundLoop: FrameRequestCallback;
 
   constructor(
@@ -54,6 +58,10 @@ export class GameLoop {
   }
 
   private createInitialState(): GameState {
+    // ボス状態は GameState に持たせず BossManager のメモリで完結させる。
+    // 新規ゲーム/タイトル復帰のたびにここで初期化し、削ったHPを次プレイへ持ち越さない。
+    this.boss.reset();
+    this.bossActive = false;
     return {
       phase: 'TITLE',
       score: 0,
@@ -122,9 +130,8 @@ export class GameLoop {
 
   private startNextLevel(): void {
     if (this.state.level >= MAX_LEVEL) {
-      this.state.phase = 'ALL_CLEAR';
-      this.state.phaseTimer = 0;
-      this.state.dotsEaten = 0;
+      // 全ステージクリア後は帰還エンディングへ直行せず、最終関門のボス戦へ。
+      this.startBossStage();
       return;
     }
     this.state.level++;
@@ -140,7 +147,38 @@ export class GameLoop {
     this.lastPowerDotCount = -1;
   }
 
+  /** 最終関門のボス戦を開始する（BOSS_READY 導入へ）。level は3のまま、部品も3個のまま。 */
+  private startBossStage(): void {
+    this.state.phase = 'BOSS_READY';
+    this.state.phaseTimer = 0;
+    this.state.dotsEaten = 0;
+    this.bossActive = true;
+    this.map.resetBossArena();
+    const params = getLevelParams(this.state.level);
+    this.player.reset(params.playerSpeed);
+    this.fruitMgr.reset();
+    this.laser.reset();
+    this.boss.reset();
+    // ステージ3クリアで全敵 VANISHED 済みだが、ボス盤面でレーザーが空振りするよう明示的に不活性化する。
+    for (const g of this.ghostMgr.ghosts) g.mode = 'VANISHED';
+    this.lastPowerDotCount = -1;
+    this.audio.play('GAME_START');
+  }
+
   private respawnPlayer(): void {
+    // ボス戦中の被弾リスポーンは BOSS_READY へ戻す。ボスHPは保持（削った進捗を維持）し、
+    // 残弾だけ一掃して復帰直後の理不尽な即死を防ぐ。敵(ghost)は不活性のまま触らない。
+    if (this.bossActive) {
+      this.state.phase = 'BOSS_READY';
+      this.state.phaseTimer = 0;
+      const params = getLevelParams(this.state.level);
+      this.player.reset(params.playerSpeed);
+      this.fruitMgr.reset();
+      this.laser.reset();
+      this.boss.clearBullets();
+      this.lastPowerDotCount = -1;
+      return;
+    }
     this.state.phase = 'READY';
     this.state.phaseTimer = 0;
     const params = getLevelParams(this.state.level);
@@ -170,7 +208,7 @@ export class GameLoop {
       this.accumulator -= FIXED_TIMESTEP;
     }
 
-    this.renderer.render(this.state, this.map, this.player, this.ghostMgr, this.fruitMgr, this.particles, this.laser);
+    this.renderer.render(this.state, this.map, this.player, this.ghostMgr, this.fruitMgr, this.particles, this.laser, this.boss);
     this.rafId = requestAnimationFrame(this.boundLoop);
   }
 
@@ -224,6 +262,29 @@ export class GameLoop {
         this.state.phaseTimer += dt;
         if (this.state.phaseTimer >= CLEAR_DURATION) {
           this.startNextLevel();
+        }
+        break;
+
+      case 'BOSS_READY':
+        this.state.phaseTimer += dt;
+        if (this.state.phaseTimer >= BOSS_READY_DURATION) {
+          this.state.phase = 'BOSS';
+          this.state.phaseTimer = 0;
+        }
+        break;
+
+      case 'BOSS':
+        this.updateBoss(dt);
+        break;
+
+      case 'BOSS_DEFEATED':
+        // 撃破演出の猶予。終了したら既存の帰還エンディング(ALL_CLEAR)へ接続する。
+        this.state.phaseTimer += dt;
+        if (this.state.phaseTimer >= BOSS_DEFEATED_DURATION) {
+          this.state.phase = 'ALL_CLEAR';
+          this.state.phaseTimer = 0;
+          this.state.dotsEaten = 0;
+          this.bossActive = false;
         }
         break;
 
@@ -316,6 +377,80 @@ export class GameLoop {
       this.storage.setHighScore(this.state.score);
       this.state.highScore = this.storage.getHighScore();
       this.state.phase = 'STAGE_CLEAR';
+      this.state.phaseTimer = 0;
+    }
+  }
+
+  /**
+   * ボス戦1フレーム。既存メカを最大限流用する:
+   *  攻撃=レーザー（フルーツ供給）でボスのHPを削り、防御=電磁バリア（パワーエサ）で被弾を防ぐ。
+   *  ボスは盤面上部で弾幕を撒き、被弾でミス（既存 PLAYER_DEAD 導線）。撃破で BOSS_DEFEATED へ。
+   */
+  private updateBoss(dt: number): void {
+    const dir = this.input.consumeDirection();
+    this.player.setNextDir(dir);
+
+    const powerBefore = this.map.getPowerDotCount();
+
+    this.player.update(dt, this.map, this.audio);
+    this.state.score += this.player.score;
+    this.player.resetScore();
+
+    const ppos = this.player.getPixelPos();
+
+    // パワーエサ取得スパーク＋電磁バリア展開（既存 updatePlaying と同じ仕組み）
+    if (this.map.getPowerDotCount() < powerBefore) {
+      this.particles.spawnBurst(ppos.x, ppos.y, COLORS.POWER_DOT, 14, 90);
+    }
+    if (this.didEatPowerDot()) {
+      this.player.activateBarrier(getLevelParams(this.state.level).barrierDuration);
+    }
+
+    // フルーツ供給（ボス生存中は出し続けてレーザーが枯れないようにする＝詰み防止）
+    const enemiesRemain = !this.boss.isDefeated;
+    this.fruitMgr.updateSpawning(dt, enemiesRemain, this.state.level, this.map.getValidFruitPositions());
+    const fruitsEaten = this.fruitMgr.update(dt, ppos);
+    if (fruitsEaten > 0) {
+      this.laser.activate();
+      this.audio.play('EAT_FRUIT');
+      this.particles.spawnBurst(ppos.x, ppos.y, getFruitDef(this.state.level).color, 16, 100);
+    }
+
+    // レーザー前進（敵は全員 VANISHED なので defeatAt は空振り）。ボスへのダメージは別途 hitByBeams で処理。
+    this.laser.update(dt, ppos, this.player.state.dir, this.map, this.ghostMgr);
+    const dmg = this.boss.hitByBeams(this.laser.getBeams());
+    if (dmg > 0) {
+      const c = this.boss.centerPixel;
+      this.particles.spawnBurst(c.x, c.y, '#FFFFFF', 6, 90);
+      this.audio.play('EAT_GHOST');
+    }
+
+    if (this.state.score > this.state.highScore) {
+      this.state.highScore = this.state.score;
+    }
+
+    // ボス本体の往復＋弾幕、その後にプレイヤー被弾判定（バリア中は弾を防ぐ）
+    this.boss.update(dt, ppos);
+    if (this.boss.checkPlayerHit(ppos, this.player.hasBarrier())) {
+      this.player.die();
+      this.audio.play('DEATH');
+    }
+
+    if (this.player.state.isDead) {
+      this.state.phase = 'PLAYER_DEAD';
+      this.state.phaseTimer = 0;
+      return;
+    }
+
+    // 撃破: HP0 で BOSS_DEFEATED へ。撃破スパーク＋ファンファーレ、ハイスコア確定。
+    if (this.boss.isDefeated) {
+      const c = this.boss.centerPixel;
+      this.particles.spawnBurst(c.x, c.y, COLORS.SHIP_THRUSTER, 40, 170);
+      this.boss.clearBullets();
+      this.storage.setHighScore(this.state.score);
+      this.state.highScore = this.storage.getHighScore();
+      this.audio.play('FANFARE');
+      this.state.phase = 'BOSS_DEFEATED';
       this.state.phaseTimer = 0;
     }
   }

@@ -5,6 +5,7 @@ import {
   ENDING_WALK_START, ENDING_RAMP_TIME, ENDING_BOARD_TIME, ENDING_LIFTOFF_TIME,
   ENDING_WARP_TIME, ENDING_EARTH_TIME, ENDING_DURATION, ENDING_FADEOUT_DURATION,
   ENDING_ROCKET_CX, ENDING_ROCKET_CY, ENDING_SHAKE_MAG, ENDING_WARP_FACTOR,
+  BOSS_BODY_RADIUS, BOSS_BULLET_RADIUS, BOSS_ARENA_COLORS,
 } from './constants.js';
 import type { MapManager } from './map.js';
 import type { PlayerManager } from './player.js';
@@ -13,6 +14,7 @@ import type { FruitManager } from './fruit.js';
 import { Starfield } from './background.js';
 import type { ParticleSystem } from './particles.js';
 import type { LaserManager } from './laser.js';
+import type { BossManager } from './boss.js';
 
 export class Renderer {
   // エンディングの大型シャトル胴体の半幅(px)。drawShuttle と shuttleRamp で共有。
@@ -65,6 +67,7 @@ export class Renderer {
     fruitMgr: FruitManager,
     particles?: ParticleSystem,
     laser?: LaserManager,
+    boss?: BossManager,
   ): void {
     const ctx = this.ctx;
 
@@ -133,6 +136,35 @@ export class Renderer {
         map.drawTo(ctx, MAP_OFFSET_Y);
         map.drawDots(ctx, MAP_OFFSET_Y);
         this.drawStageClear(state.phaseTimer, state.partsCollected);
+        break;
+
+      case 'BOSS_READY':
+        map.drawTo(ctx, MAP_OFFSET_Y);
+        map.drawDots(ctx, MAP_OFFSET_Y);
+        this.drawFruit(fruitMgr);
+        this.drawPlayer(player);
+        if (boss) { this.drawBoss(boss); this.drawBossHpBar(boss); }
+        this.drawBossWarning(state.phaseTimer);
+        break;
+
+      case 'BOSS':
+        map.drawTo(ctx, MAP_OFFSET_Y);
+        map.drawDots(ctx, MAP_OFFSET_Y);
+        this.drawFruit(fruitMgr);
+        this.drawPlayer(player);
+        if (laser) this.drawLaser(laser);
+        if (boss) {
+          this.drawBoss(boss);
+          this.drawBossBullets(boss);
+          this.drawBossHpBar(boss);
+        }
+        break;
+
+      case 'BOSS_DEFEATED':
+        map.drawTo(ctx, MAP_OFFSET_Y);
+        map.drawDots(ctx, MAP_OFFSET_Y);
+        this.drawPlayer(player);
+        if (boss) this.drawBossDefeated(boss, state.phaseTimer);
         break;
 
       case 'ALL_CLEAR':
@@ -1137,6 +1169,184 @@ export class Renderer {
       ctx.stroke();
     }
     ctx.restore();
+  }
+
+  /** ボス本体（盤面上部に陣取る巨大エイリアン司令官）。座標は盤面ローカル＋MAP_OFFSET_Y。 */
+  private drawBoss(boss: BossManager): void {
+    const ctx = this.ctx;
+    const c = boss.centerPixel;
+    const px = c.x;
+    const py = c.y + MAP_OFFSET_Y;
+    const r = BOSS_BODY_RADIUS;
+    const t = performance.now() / 1000;
+    const pulse = 0.5 + 0.5 * Math.sin(t * 3);
+    const accent = boss.isDefeated ? '#6A2030' : BOSS_ARENA_COLORS.glow;
+
+    ctx.save();
+    ctx.shadowColor = accent;
+    ctx.shadowBlur = 16 + pulse * 10;
+
+    // 触角（4本・先端に発光球）
+    ctx.strokeStyle = accent;
+    ctx.lineWidth = 3;
+    for (const sx of [-r * 0.5, -r * 0.18, r * 0.18, r * 0.5]) {
+      ctx.beginPath();
+      ctx.moveTo(px + sx * 0.7, py - r * 0.55);
+      ctx.lineTo(px + sx, py - r * 1.15);
+      ctx.stroke();
+      ctx.fillStyle = accent;
+      ctx.beginPath();
+      ctx.arc(px + sx, py - r * 1.2, r * 0.1, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // 頭（ドーム）＋波打つ下端（触手）
+    const grad = ctx.createLinearGradient(px, py - r, px, py + r);
+    grad.addColorStop(0, '#FF9AA8');
+    grad.addColorStop(1, BOSS_ARENA_COLORS.wall);
+    ctx.fillStyle = boss.isDefeated ? accent : grad;
+    ctx.beginPath();
+    ctx.arc(px, py, r, Math.PI, 0);
+    const bottom = py + r;
+    const segments = 8;
+    const segW = (r * 2) / segments;
+    for (let i = 0; i <= segments; i++) {
+      const bx = px - r + i * segW;
+      const by = i % 2 === 0 ? bottom : bottom - r * 0.4;
+      ctx.lineTo(bx, by);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // 複数の目（中央＋左右。脅威的な顔）
+    const eyes: ReadonlyArray<readonly [number, number]> = [
+      [-r * 0.42, -r * 0.05], [r * 0.42, -r * 0.05], [0, r * 0.2],
+    ];
+    for (const [ex, ey] of eyes) {
+      ctx.fillStyle = '#FFE08A';
+      ctx.beginPath();
+      ctx.arc(px + ex, py + ey, r * 0.22, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#0A0A1A';
+      ctx.beginPath();
+      ctx.arc(px + ex, py + ey, r * 0.1, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  /** ボスの弾幕（加算合成で発光する弾）。座標は盤面ローカル。 */
+  private drawBossBullets(boss: BossManager): void {
+    const bullets = boss.getBullets();
+    if (bullets.length === 0) return;
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (const b of bullets) {
+      const x = b.x;
+      const y = b.y + MAP_OFFSET_Y;
+      ctx.fillStyle = 'rgba(255,138,60,0.5)'; // 外側のグロー
+      ctx.beginPath();
+      ctx.arc(x, y, BOSS_BULLET_RADIUS * 1.8, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#FFE6A0'; // 白熱コア
+      ctx.beginPath();
+      ctx.arc(x, y, BOSS_BULLET_RADIUS, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  /** ボスのHPバー（盤面上部）。残量で色が緑→黄→赤に変わる。 */
+  private drawBossHpBar(boss: BossManager): void {
+    const ctx = this.ctx;
+    const ratio = boss.getHpRatio();
+    const margin = TILE_SIZE;
+    const w = CANVAS_WIDTH - margin * 2;
+    const h = 12;
+    const x = margin;
+    const y = MAP_OFFSET_Y + 8;
+
+    ctx.save();
+    // 背景枠
+    ctx.fillStyle = 'rgba(8,10,26,0.85)';
+    ctx.beginPath();
+    this.roundRectPath(x - 2, y - 2, w + 4, h + 4, 4);
+    ctx.fill();
+    // 残量
+    const color = ratio > 0.5 ? '#46F0D8' : ratio > 0.25 ? '#FFC24D' : '#FF4D5E';
+    ctx.fillStyle = color;
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 8;
+    ctx.beginPath();
+    this.roundRectPath(x, y, Math.max(0, w * ratio), h, 4);
+    ctx.fill();
+    ctx.restore();
+
+    this.glowText('BOSS', x, y - 4, `${TILE_SIZE - 8}px monospace`, '#FF5C6E', 6, 'left');
+  }
+
+  /** ボス戦の導入（WARNING）。点滅する警告で「最終関門」を伝える。 */
+  private drawBossWarning(timer: number): void {
+    const cx = CANVAS_WIDTH / 2;
+    const cy = CANVAS_HEIGHT / 2;
+    const fade = Math.min(1, timer / 0.4);
+    this.drawPanel(cy, 80);
+    const blink = (0.5 + 0.5 * Math.sin(performance.now() / 180)) * fade;
+    this.glowText('⚠ WARNING ⚠', cx, cy - 20, `bold ${TILE_SIZE + 2}px monospace`, '#FF4D5E', 14, 'center', blink);
+    this.glowText('BOSS APPROACHING', cx, cy + 16, `bold ${TILE_SIZE}px monospace`, '#FFE08A', 10, 'center', fade);
+    this.glowText('最終関門 — 司令官を撃て', cx, cy + 46, `${TILE_SIZE - 6}px monospace`, '#CFE6FF', 6, 'center', fade);
+  }
+
+  /** ボス撃破演出（フラッシュ＋爆散リング＋破片）。完了後に gameLoop が帰還エンディングへ接続する。 */
+  private drawBossDefeated(boss: BossManager, timer: number): void {
+    const ctx = this.ctx;
+    const c = boss.centerPixel;
+    const px = c.x;
+    const py = c.y + MAP_OFFSET_Y;
+    const r = BOSS_BODY_RADIUS;
+    const p = Math.min(1, timer / 1.0); // 爆散の進行（1秒で完了）
+
+    // 序盤のホワイトフラッシュ
+    if (timer < 0.3) {
+      ctx.save();
+      ctx.globalAlpha = (1 - timer / 0.3) * 0.6;
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+      ctx.restore();
+    }
+
+    // 爆散リング＋放射状の破片
+    if (p < 1) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      const ringR = r * (0.5 + p * 2.5);
+      ctx.strokeStyle = `rgba(255,140,60,${1 - p})`;
+      ctx.lineWidth = 4 * (1 - p) + 1;
+      ctx.beginPath();
+      ctx.arc(px, py, ringR, 0, Math.PI * 2);
+      ctx.stroke();
+
+      const shards = 10;
+      const spread = r * (0.6 + p * 2.2);
+      const shardR = r * 0.3 * (1 - p);
+      if (shardR > 0.5) {
+        ctx.fillStyle = COLORS.SHIP_THRUSTER;
+        for (let i = 0; i < shards; i++) {
+          const a = (i / shards) * Math.PI * 2;
+          ctx.beginPath();
+          ctx.arc(px + Math.cos(a) * spread, py + Math.sin(a) * spread, shardR, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+      ctx.restore();
+    }
+
+    // 撃破テキスト
+    const reveal = Math.min(1, Math.max(0, (timer - 0.5) / 0.4));
+    this.glowText('BOSS DOWN', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2,
+      `bold ${Math.round(TILE_SIZE * 1.6)}px monospace`, '#FFE08A', 16, 'center', reveal);
   }
 
   private drawStageClear(timer: number, partsCollected: number): void {

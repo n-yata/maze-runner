@@ -6,4 +6,5 @@ coverage/
 test-results/
 playwright-report/
 .playwright/
+.playwright-mcp/
 .claude/settings.local.json
