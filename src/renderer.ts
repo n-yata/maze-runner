@@ -15,6 +15,7 @@ import { Starfield } from './background.js';
 import type { ParticleSystem } from './particles.js';
 import type { LaserManager } from './laser.js';
 import type { BossManager } from './boss.js';
+import type { TouchPadState } from './input.js';
 
 export class Renderer {
   // エンディングの大型シャトル胴体の半幅(px)。drawShuttle と shuttleRamp で共有。
@@ -68,6 +69,7 @@ export class Renderer {
     particles?: ParticleSystem,
     laser?: LaserManager,
     boss?: BossManager,
+    touchPad?: TouchPadState,
   ): void {
     const ctx = this.ctx;
 
@@ -184,9 +186,14 @@ export class Renderer {
     if (particles) {
       particles.draw(ctx, MAP_OFFSET_Y);
     }
+    if (touchPad?.active) {
+      this.drawTouchPad(touchPad);
+    }
   }
 
   private drawUI(state: GameState): void {
+    this.drawChromeFrame();
+
     const scoreFont = `${TILE_SIZE - 3}px monospace`;
     this.glowText(`SCORE ${state.score}`, TILE_SIZE - 2, TILE_SIZE, scoreFont, COLORS.DOT, 6, 'left');
     this.glowText(`HI ${state.highScore}`, CANVAS_WIDTH - TILE_SIZE + 2, TILE_SIZE, scoreFont, COLORS.POWER_DOT, 6, 'right');
@@ -206,6 +213,112 @@ export class Renderer {
       this.drawAstronautBody(TILE_SIZE / 2 - 1, 'DOWN', 0);
       ctx.restore();
     }
+  }
+
+  /** Draws subtle HUD and playfield framing. */
+  private drawChromeFrame(): void {
+    const ctx = this.ctx;
+    ctx.save();
+    const edge = ctx.createLinearGradient(0, 0, 0, CANVAS_HEIGHT);
+    edge.addColorStop(0, 'rgba(125,240,255,0.16)');
+    edge.addColorStop(0.18, 'rgba(125,240,255,0.04)');
+    edge.addColorStop(1, 'rgba(255,230,109,0.08)');
+    ctx.strokeStyle = edge;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(1, 1, CANVAS_WIDTH - 2, CANVAS_HEIGHT - 2);
+
+    ctx.strokeStyle = 'rgba(125,240,255,0.18)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(TILE_SIZE * 0.5, MAP_OFFSET_Y - TILE_SIZE * 0.35);
+    ctx.lineTo(CANVAS_WIDTH - TILE_SIZE * 0.5, MAP_OFFSET_Y - TILE_SIZE * 0.35);
+    ctx.stroke();
+
+    const vignette = ctx.createRadialGradient(
+      CANVAS_WIDTH / 2,
+      CANVAS_HEIGHT * 0.42,
+      CANVAS_WIDTH * 0.1,
+      CANVAS_WIDTH / 2,
+      CANVAS_HEIGHT * 0.45,
+      CANVAS_HEIGHT * 0.7,
+    );
+    vignette.addColorStop(0, 'rgba(255,255,255,0)');
+    vignette.addColorStop(1, 'rgba(0,0,0,0.22)');
+    ctx.fillStyle = vignette;
+    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    ctx.restore();
+  }
+
+  private drawTouchPad(pad: TouchPadState): void {
+    const center = this.viewportToCanvas(pad.startX, pad.startY);
+    const current = this.viewportToCanvas(pad.currentX, pad.currentY);
+    const ctx = this.ctx;
+    const radius = TILE_SIZE * 1.38;
+    const nubRadius = TILE_SIZE * 0.38;
+    const dx = current.x - center.x;
+    const dy = current.y - center.y;
+    const dist = Math.hypot(dx, dy);
+    const limit = radius * 0.62;
+    const scale = dist > limit && dist > 0 ? limit / dist : 1;
+    const nubX = center.x + dx * scale;
+    const nubY = center.y + dy * scale;
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = 'rgba(125,240,255,0.78)';
+    ctx.fillStyle = 'rgba(5,10,24,0.36)';
+    ctx.shadowColor = COLORS.DOT;
+    ctx.shadowBlur = 12;
+    ctx.beginPath();
+    ctx.arc(center.x, center.y, radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.shadowBlur = 0;
+    this.drawTouchPadArrow(center.x, center.y - radius * 0.62, 'UP', pad.direction);
+    this.drawTouchPadArrow(center.x, center.y + radius * 0.62, 'DOWN', pad.direction);
+    this.drawTouchPadArrow(center.x - radius * 0.62, center.y, 'LEFT', pad.direction);
+    this.drawTouchPadArrow(center.x + radius * 0.62, center.y, 'RIGHT', pad.direction);
+
+    ctx.fillStyle = pad.direction === 'NONE' ? 'rgba(255,255,255,0.72)' : COLORS.POWER_DOT;
+    ctx.shadowColor = ctx.fillStyle;
+    ctx.shadowBlur = 10;
+    ctx.beginPath();
+    ctx.arc(nubX, nubY, nubRadius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  private drawTouchPadArrow(x: number, y: number, dir: Direction, activeDir: Direction): void {
+    const ctx = this.ctx;
+    const size = TILE_SIZE * 0.28;
+    const active = dir === activeDir;
+    ctx.save();
+    ctx.translate(x, y);
+    if (dir === 'RIGHT') ctx.rotate(Math.PI / 2);
+    if (dir === 'DOWN') ctx.rotate(Math.PI);
+    if (dir === 'LEFT') ctx.rotate(-Math.PI / 2);
+    ctx.fillStyle = active ? COLORS.POWER_DOT : 'rgba(207,230,255,0.45)';
+    ctx.shadowColor = active ? COLORS.POWER_DOT : 'transparent';
+    ctx.shadowBlur = active ? 8 : 0;
+    ctx.beginPath();
+    ctx.moveTo(0, -size);
+    ctx.lineTo(size * 0.82, size * 0.74);
+    ctx.lineTo(-size * 0.82, size * 0.74);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
+  private viewportToCanvas(clientX: number, clientY: number): { x: number; y: number } {
+    const rect = this.ctx.canvas.getBoundingClientRect();
+    const scaleX = rect.width > 0 ? CANVAS_WIDTH / rect.width : 1;
+    const scaleY = rect.height > 0 ? CANVAS_HEIGHT / rect.height : 1;
+    return {
+      x: (clientX - rect.left) * scaleX,
+      y: (clientY - rect.top) * scaleY,
+    };
   }
 
   /** グロー付きテキスト描画ヘルパー。 */

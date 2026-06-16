@@ -202,7 +202,17 @@ export class GameLoop {
       this.accumulator -= FIXED_TIMESTEP;
     }
 
-    this.renderer.render(this.state, this.map, this.player, this.ghostMgr, this.fruitMgr, this.particles, this.laser, this.boss);
+    this.renderer.render(
+      this.state,
+      this.map,
+      this.player,
+      this.ghostMgr,
+      this.fruitMgr,
+      this.particles,
+      this.laser,
+      this.boss,
+      this.input.getTouchPadState(),
+    );
     this.rafId = requestAnimationFrame(this.boundLoop);
   }
 
